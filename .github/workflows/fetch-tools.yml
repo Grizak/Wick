@@ -151,6 +151,6 @@ jobs:
       - name: Fix branch stuff
         run: |
           git push
-          git checkout dev
+          git checkout dev 2>/dev/null || git checkout -b dev
           git merge master
           git push
