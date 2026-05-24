@@ -30,12 +30,12 @@ func Init() error {
 
 	lldName := "lld-" + versions["lld"]
 	if runtime.GOOS == "windows" {
-		lldName = "lld.exe"
+		lldName = lldName + ".exe"
 	}
 
 	nasmName := "nasm-" + versions["nasm"]
 	if runtime.GOOS == "windows" {
-		nasmName = "nasm.exe"
+		nasmName = nasmName + ".exe"
 	}
 
 	for _, b := range []struct {
