@@ -146,7 +146,15 @@ jobs:
       - name: Commit binaries
         run: |
           git add src/tools/bin/
-          git commit -m "chore: update tool binaries"
+          if git diff --staged --quiet && git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update tool binaries"
+            git push origin master
+            git checkout dev 2>/dev/null || git checkout -b dev
+            git merge master
+            git push origin dev
+          fi
 
       - name: Fix branch stuff
         run: |
