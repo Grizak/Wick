@@ -1,6 +1,10 @@
-package main
+package tokenizer
 
-import "unicode"
+import (
+	"unicode"
+
+	"github.com/Grizak/Wick/src/types"
+)
 
 type Tokenizer struct {
 	content string
@@ -17,23 +21,23 @@ func NewTokenizer(content string) *Tokenizer {
 }
 
 // Goroutine, write to output, block if output is full
-func (t *Tokenizer) Tokenize(output chan Token) {
+func (t *Tokenizer) Tokenize(output chan types.Token) {
 	for {
 		r := t.peek(0)
 
 		if r == 0 {
-			output <- Token{_type: TokenEOF, line: t.line()}
+			output <- types.Token{Type: types.TokenEOF, Line: t.line()}
 			break
 		}
 
-		switch TokenType(r) {
-		case TokenOpenParen:
+		switch types.TokenType(r) {
+		case types.TokenOpenParen:
 			t.consume()
-			output <- Token{_type: TokenOpenParen, line: t.line()}
+			output <- types.Token{Type: types.TokenOpenParen, Line: t.line()}
 			continue
-		case TokenCloseParen:
+		case types.TokenCloseParen:
 			t.consume()
-			output <- Token{_type: TokenCloseParen, line: t.line()}
+			output <- types.Token{Type: types.TokenCloseParen, Line: t.line()}
 			continue
 		default:
 			// Check if it's whitespace
@@ -66,12 +70,12 @@ func (t *Tokenizer) Tokenize(output chan Token) {
 			if isNumber {
 				// We have a number
 				str := string(buffer)
-				output <- Token{_type: TokenIntLit, value: &str, line: t.line()}
+				output <- types.Token{Type: types.TokenIntLit, Value: &str, Line: t.line()}
 			} else {
 				// Check if it's a keyword
 				switch string(buffer) {
 				case "exit":
-					output <- Token{_type: TokenExit, line: t.line()}
+					output <- types.Token{Type: types.TokenExit, Line: t.line()}
 				default: // Identifier
 					panic("Not implemented: identifiers")
 				}

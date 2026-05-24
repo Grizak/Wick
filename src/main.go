@@ -3,35 +3,23 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
+	"github.com/Grizak/Wick/src/backends"
+	"github.com/Grizak/Wick/src/parser"
+	"github.com/Grizak/Wick/src/tokenizer"
+	"github.com/Grizak/Wick/src/tools"
+	"github.com/Grizak/Wick/src/types"
 	"github.com/alexflint/go-arg"
-	"github.com/mohae/randchars"
+	randchars "github.com/mohae/randchars"
 )
 
-var version string
-
-type TokenType string
-
-const (
-	TokenExit       TokenType = "exit"
-	TokenOpenParen  TokenType = "("
-	TokenCloseParen TokenType = ")"
-	TokenIntLit     TokenType = "int_lit"
-	TokenEOF        TokenType = "eof"
-)
-
-type Token struct {
-	_type TokenType
-	value *string
-	line  int
-}
+var version string // Filled in by ldflags at build time
 
 type Args struct {
 	Input              []string `arg:"positional,required" help:"Input file(s)"`
 	Output             string   `arg:"-o,--output" help:"Output file"`
 	SaveIntermediaries bool     `arg:"-s,--save-intermediaries" help:"Save intermediary files"`
+	Target             string   `arg:"-t,--target" env:"WICK_TARGET" default:"linux/amd64" help:"Compilation target (default: linux/amd64)"`
 }
 
 func (Args) Version() string {
@@ -55,6 +43,15 @@ func main() {
 
 	var generatedFiles []string
 
+	tools.Init()
+	defer tools.Cleanup()
+
+	backend, err := backends.New(args.Target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s %s: %s\n", "failed to create backend", args.Target, err.Error())
+		os.Exit(1)
+	}
+
 	for i := range args.Input {
 		input := args.Input[i]
 
@@ -64,65 +61,21 @@ func main() {
 			os.Exit(1)
 		}
 
-		tokenizer := NewTokenizer(string(content))
-		output := make(chan Token, 4096)
+		tokenizer := tokenizer.NewTokenizer(string(content))
+		output := make(chan types.Token, 4096)
 		tokenizer.Tokenize(output)
 
-		parser := NewParser()
+		parser := parser.NewParser()
 		program := parser.Parse(output)
 
-		generator := NewGenerator(program)
-		// Use the generator to generate assembly code
-		asm := generator.Generate()
+		outputFile := args.Output + "_" + string(randchars.LowerAlpha(8))
 
-		// Write the assembly code to a file
-		outputFile := args.Output
-		if outputFile == "" {
-			outputFile = input[:len(input)-len(".wi")]
-		}
+		backend.Generate(program, outputFile+".asm")
 
-		outputFile += "_" + string(randchars.LowerAlpha(8)) + ".asm"
+		backend.Assemble(outputFile+".asm", outputFile+".o", args.SaveIntermediaries)
 
-		generatedFiles = append(generatedFiles, outputFile[:len(outputFile)-len(".asm")]+".o")
-
-		err = os.WriteFile(outputFile, []byte(asm), 0644)
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s %s: %s\n", "failed to write output file", outputFile, err.Error())
-			os.Exit(1)
-		}
-
-		if !args.SaveIntermediaries {
-			defer os.Remove(outputFile)
-		}
-
-		// Use nasm to compile the assembly code to an object file
-		objectFile := outputFile[:len(outputFile)-len(".asm")] + ".o"
-		cmd := fmt.Sprintf("nasm -f elf64 %s -o %s", outputFile, objectFile)
-		err = executeCommand(cmd)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", "failed to compile assembly code", err.Error())
-			os.Exit(1)
-		}
-
-		if !args.SaveIntermediaries {
-			defer os.Remove(objectFile)
-		}
+		generatedFiles = append(generatedFiles, outputFile+".o")
 	}
 
-	// Use ld to link the object files into an executable
-	cmd := fmt.Sprintf("ld -o %s %s", args.Output, strings.Join(generatedFiles, " "))
-	err := executeCommand(cmd)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s\n", "failed to link object files", err.Error())
-		os.Exit(1)
-	}
-}
-
-// executeCommand runs a shell command string and returns any error encountered.
-func executeCommand(cmd string) error {
-	c := exec.Command("/bin/sh", "-c", cmd)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
+	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries)
 }
