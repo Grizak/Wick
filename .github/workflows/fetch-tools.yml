@@ -30,8 +30,8 @@ jobs:
 
       - name: Write versions
         run: |
-          NASM_VERSION=$(nasm --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?'')
-          LLD_VERSION=$(ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?'')
+          NASM_VERSION=$(nasm --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/linux_amd64/versions.json
 
       - uses: actions/upload-artifact@v4
