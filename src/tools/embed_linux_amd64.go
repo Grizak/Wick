@@ -9,3 +9,6 @@ var nasmBinary []byte
 
 //go:embed bin/linux_amd64/lld
 var lldBinary []byte
+
+//go:embed bin/linux_amd64/versions.json
+var versionsJSON []byte
