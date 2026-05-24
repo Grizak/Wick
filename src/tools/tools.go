@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"os/exec"
@@ -11,22 +12,37 @@ import (
 var tmpDir string
 
 func Init() error {
-	dir, err := os.MkdirTemp("", "wick-tools-*")
+	dir, err := cacheDir()
 	if err != nil {
 		return err
 	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
 	tmpDir = dir
 
-	lldName := "lld"
+	versions := make(map[string]string)
+	if err := json.Unmarshal(versionsJSON, &versions); err != nil {
+		return err
+	}
+
+	lldName := "lld-" + versions["lld"]
 	if runtime.GOOS == "windows" {
 		lldName = "lld.exe"
+	}
+
+	nasmName := "nasm-" + versions["nasm"]
+	if runtime.GOOS == "windows" {
+		nasmName = "nasm.exe"
 	}
 
 	for _, b := range []struct {
 		name string
 		data []byte
 	}{
-		{"nasm", nasmBinary},
+		{nasmName, nasmBinary},
 		{lldName, lldBinary},
 	} {
 		path := filepath.Join(tmpDir, b.name)
@@ -35,12 +51,6 @@ func Init() error {
 		}
 	}
 	return nil
-}
-
-func Cleanup() {
-	if tmpDir != "" {
-		os.RemoveAll(tmpDir)
-	}
 }
 
 func NasmPath() string {
@@ -66,4 +76,14 @@ func ExecuteCommand(cmd string) error {
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
+}
+
+func cacheDir() (string, error) {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(base, "wick", "tools")
+	return dir, nil
 }
