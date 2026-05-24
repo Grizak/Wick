@@ -77,6 +77,8 @@ jobs:
   commit:
     needs: [fetch-linux-amd64, fetch-darwin-arm64, fetch-windows-amd64]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
