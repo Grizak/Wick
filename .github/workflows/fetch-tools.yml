@@ -25,7 +25,7 @@ jobs:
       - name: Download LLD
         run: |
           sudo apt-get install -y lld
-          cp $(which lld) src/tools/bin/linux_amd64/lld
+          cp $(which ld.lld) src/tools/bin/linux_amd64/lld
           chmod +x src/tools/bin/linux_amd64/lld
 
       - name: Write versions
@@ -58,13 +58,13 @@ jobs:
       - name: Download LLD
         run: |
           brew install lld
-          cp $(brew --prefix lld)/bin/lld src/tools/bin/darwin_arm64/lld
+          cp $(brew --prefix lld)/bin/ld64.lld src/tools/bin/darwin_arm64/lld
           chmod +x src/tools/bin/darwin_arm64/lld
 
       - name: Write versions
         run: |
           NASM_VERSION=$(nasm --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-          LLD_VERSION=$(lld -flavor darwin --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          LLD_VERSION=$(ld64.lld --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v4
@@ -99,14 +99,14 @@ jobs:
       - name: Download LLD
         run: |
           choco install llvm
-          cp "C:\Program Files\LLVM\bin\lld.exe" src/tools/bin/windows_amd64/lld.exe
+          cp "C:\Program Files\LLVM\bin\lld-link.exe" src/tools/bin/windows_amd64/lld.exe
 
       - name: Write versions
         shell: pwsh
         run: |
           $NASM_VERSION = (& src/tools/bin/windows_amd64/nasm.exe --version) -replace '.*?(\d+\.\d+\.\d+).*', '$1'
-          $LLD_VERSION = (& "C:\Program Files\LLVM\bin\lld.exe" --version) -replace '.*?(\d+\.\d+\.\d+).*', '$1'
-          "{`"nasm`": `"$NASM_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8
+          $LLD_VERSION = (& "C:\Program Files\LLVM\bin\lld-link.exe" --version) -replace '.*?(\d+\.\d+\.\d+).*', '$1'
+          "{`"nasm`": `"$NASM_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8NoBOM
 
       - uses: actions/upload-artifact@v4
         with:
