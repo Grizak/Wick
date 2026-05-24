@@ -2,8 +2,8 @@ name: Fetch Tools
 
 on:
   workflow_dispatch: # run manually
-  release:
-    types: [created] # or on new releases
+  schedule:
+    - cron: "0 0 * * 1"
 
 jobs:
   fetch-linux-amd64:
@@ -82,6 +82,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout master
+
       - uses: actions/download-artifact@v4
         with:
           name: linux-amd64-tools
@@ -99,8 +105,12 @@ jobs:
 
       - name: Commit binaries
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/tools/bin/
           git commit -m "chore: update tool binaries"
+
+      - name: Fix branch stuff
+        run: |
+          git push
+          git checkout dev
+          git merge master
           git push
