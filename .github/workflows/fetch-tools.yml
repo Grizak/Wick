@@ -13,9 +13,10 @@ jobs:
 
       - name: Download NASM
         run: |
-          curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/linux/nasm-2.16.03-0.fc36.x86_64.rpm -o nasm.rpm
-          rpm2cpio nasm.rpm | cpio -idmv
-          cp usr/bin/nasm src/tools/bin/linux_amd64/nasm
+          mkdir -p src/tools/bin/linux_amd64
+          curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/linux/nasm-2.16.03-0.fc36.x86_64.tar.gz -o nasm.tar.gz
+          tar -xzf nasm.tar.gz
+          cp nasm-2.16.03/nasm src/tools/bin/linux_amd64/nasm
           chmod +x src/tools/bin/linux_amd64/nasm
 
       - name: Download LLD
@@ -36,6 +37,7 @@ jobs:
 
       - name: Download NASM
         run: |
+          mkdir -p src/tools/bin/darwin_arm64
           brew install nasm
           cp $(which nasm) src/tools/bin/darwin_arm64/nasm
           chmod +x src/tools/bin/darwin_arm64/nasm
@@ -58,6 +60,7 @@ jobs:
 
       - name: Download NASM
         run: |
+          mkdir -p src/tools/bin/windows_amd64
           curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip -o nasm.zip
           Expand-Archive nasm.zip -DestinationPath nasm
           cp nasm/nasm-2.16.03/nasm.exe src/tools/bin/windows_amd64/nasm.exe
