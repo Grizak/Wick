@@ -1,16 +1,18 @@
-package main
+package linux_amd64
 
 import (
 	"strconv"
 	"strings"
+
+	"github.com/Grizak/Wick/src/types"
 )
 
 type Generator struct {
-	root   NodeProgram
+	root   *types.NodeProgram
 	output strings.Builder
 }
 
-func NewGenerator(root NodeProgram) *Generator {
+func NewGenerator(root *types.NodeProgram) *Generator {
 	g := Generator{
 		root: root,
 	}
@@ -22,7 +24,7 @@ func (g *Generator) Generate() string {
 	g.output.WriteString("section .text\n")
 	g.output.WriteString("global _start\n")
 	g.output.WriteString("_start:\n")
-	for _, statement := range g.root.statements {
+	for _, statement := range g.root.Statements {
 		if statement.Exit != nil {
 			g.generateExit(statement.Exit)
 		}
@@ -30,7 +32,7 @@ func (g *Generator) Generate() string {
 	return g.output.String()
 }
 
-func (g *Generator) generateExit(exit *NodeExit) {
+func (g *Generator) generateExit(exit *types.NodeExit) {
 	g.writeLine("mov rax, 60")
 	g.writeLine("mov rdi, " + strconv.Itoa(exit.Expr.IntLit))
 	g.writeLine("syscall")
