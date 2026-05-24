@@ -31,13 +31,13 @@ jobs:
       - name: Write versions
         run: |
           NASM_VERSION=$(nasm --version | grep -oP '\d+\.\d+\.\d+')
-          LLD_VERSION=$(lld -flavor gnu --version | grep -oP '\d+\.\d+\.\d+')
+          LLD_VERSION=$(ld.lld --version | grep -oP '\d+\.\d+\.\d+')
           echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/linux_amd64/versions.json
 
-            - uses: actions/upload-artifact@v4
-              with:
-                name: linux-amd64-tools
-                path: src/tools/bin/linux_amd64/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64-tools
+          path: src/tools/bin/linux_amd64/
 
   fetch-darwin-arm64:
     runs-on: macos-latest
@@ -63,8 +63,8 @@ jobs:
 
       - name: Write versions
         run: |
-          NASM_VERSION=$(nasm --version | grep -oP '\d+\.\d+\.\d+')
-          LLD_VERSION=$(lld -flavor darwin --version | grep -oP '\d+\.\d+\.\d+')
+          NASM_VERSION=$(nasm --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          LLD_VERSION=$(lld -flavor darwin --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v4
@@ -79,14 +79,22 @@ jobs:
 
       - name: Cleanup
         run: |
-          rm -rf src/tools/bin/windows_amd64
+          if (Test-Path src/tools/bin/windows_amd64) {
+            Remove-Item -Recurse -Force src/tools/bin/windows_amd64
+          }
 
       - name: Download NASM
         run: |
           mkdir -p src/tools/bin/windows_amd64
-          curl -L https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip -o nasm.zip
+          $NASM_VERSION = (Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/" -UseBasicParsing).Links.href `
+            | Where-Object { $_ -match '^\d+\.\d+\.\d+/$' } `
+            | ForEach-Object { $_ -replace '/$', '' } `
+            | Sort-Object { [version]$_ } `
+            | Select-Object -Last 1
+          Write-Host "Latest NASM version: $NASM_VERSION"
+          Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/$NASM_VERSION/win64/nasm-$NASM_VERSION-win64.zip" -OutFile nasm.zip
           Expand-Archive nasm.zip -DestinationPath nasm
-          cp nasm/nasm-2.16.03/nasm.exe src/tools/bin/windows_amd64/nasm.exe
+          cp nasm/nasm-$NASM_VERSION/nasm.exe src/tools/bin/windows_amd64/nasm.exe
 
       - name: Download LLD
         run: |
@@ -94,10 +102,11 @@ jobs:
           cp "C:\Program Files\LLVM\bin\lld.exe" src/tools/bin/windows_amd64/lld.exe
 
       - name: Write versions
+        shell: pwsh
         run: |
-          NASM_VERSION=$(nasm --version | grep -oP '\d+\.\d+\.\d+')
-          LLD_VERSION=$(lld -flavor link --version | grep -oP '\d+\.\d+\.\d+')
-              echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
+          $NASM_VERSION = (& src/tools/bin/windows_amd64/nasm.exe --version) -replace '.*?(\d+\.\d+\.\d+).*', '$1'
+          $LLD_VERSION = (& "C:\Program Files\LLVM\bin\lld.exe" --version) -replace '.*?(\d+\.\d+\.\d+).*', '$1'
+          "{`"nasm`": `"$NASM_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8
 
       - uses: actions/upload-artifact@v4
         with:
