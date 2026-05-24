@@ -64,7 +64,8 @@ jobs:
       - name: Write versions
         run: |
           NASM_VERSION=$(nasm --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-          LLD_VERSION=$($(brew --prefix lld)/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          LLD_PREFIX=$(brew --prefix lld)
+          LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           echo "{\"nasm\": \"$NASM_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v4
