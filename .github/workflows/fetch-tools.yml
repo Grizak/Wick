@@ -51,28 +51,6 @@ jobs:
           name: darwin-arm64-tools
           path: src/tools/bin/darwin_arm64/
 
-  fetch-darwin-amd64:
-    runs-on: macos-13 # last Intel macOS runner
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download NASM
-        run: |
-          brew install nasm
-          cp $(which nasm) src/tools/bin/darwin_amd64/nasm
-          chmod +x src/tools/bin/darwin_amd64/nasm
-
-      - name: Download LLD
-        run: |
-          brew install llvm
-          cp $(brew --prefix llvm)/bin/lld src/tools/bin/darwin_amd64/lld
-          chmod +x src/tools/bin/darwin_amd64/lld
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: darwin-amd64-tools
-          path: src/tools/bin/darwin_amd64/
-
   fetch-windows-amd64:
     runs-on: windows-latest
     steps:
@@ -95,13 +73,7 @@ jobs:
           path: src/tools/bin/windows_amd64/
 
   commit:
-    needs:
-      [
-        fetch-linux-amd64,
-        fetch-darwin-arm64,
-        fetch-darwin-amd64,
-        fetch-windows-amd64,
-      ]
+    needs: [fetch-linux-amd64, fetch-darwin-arm64, fetch-windows-amd64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,11 +87,6 @@ jobs:
         with:
           name: darwin-arm64-tools
           path: src/tools/bin/darwin_arm64/
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: darwin-amd64-tools
-          path: src/tools/bin/darwin_amd64/
 
       - uses: actions/download-artifact@v4
         with:
