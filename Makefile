@@ -1,7 +1,7 @@
 GO = go
 BUILD_DIR = build
 TARGET = $(BUILD_DIR)/wickc
-SOURCES = src/main.go src/tokenizer.go src/parser.go src/generator.go
+SOURCES = src/main.go
 
 .PHONY: all clean
 
