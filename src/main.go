@@ -44,7 +44,6 @@ func main() {
 	var generatedFiles []string
 
 	tools.Init()
-	defer tools.Cleanup()
 
 	backend, err := backends.New(args.Target)
 	if err != nil {
