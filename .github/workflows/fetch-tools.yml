@@ -81,11 +81,16 @@ jobs:
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
 
       - name: Download LLC and LLD
+        shell: pwsh
         run: |
-          choco install llvm
-          mkdir -p src/tools/bin/windows_amd64
-          cp "C:\Program Files\LLVM\bin\llc.exe" src/tools/bin/windows_amd64/llc.exe
-          cp "C:\Program Files\LLVM\bin\lld-link.exe" src/tools/bin/windows_amd64/lld.exe
+          choco upgrade llvm
+          $LLC_PATH = (Get-Command llc).Source
+          $LLD_PATH = (Get-Command lld-link).Source
+          Write-Host "LLC: $LLC_PATH"
+          Write-Host "LLD: $LLD_PATH"
+          New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
+          Copy-Item $LLC_PATH src/tools/bin/windows_amd64/llc.exe
+          Copy-Item $LLD_PATH src/tools/bin/windows_amd64/lld.exe
 
       - name: Write versions
         shell: pwsh
