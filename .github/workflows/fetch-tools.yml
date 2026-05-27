@@ -95,8 +95,10 @@ jobs:
       - name: Write versions
         shell: pwsh
         run: |
-          $LLC_VERSION = (& "C:\Program Files\LLVM\bin\llc.exe" --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
-          $LLD_VERSION = (& "C:\Program Files\LLVM\bin\lld-link.exe" --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
+          $LLC_PATH = (Get-Command llc).Source
+          $LLD_PATH = (Get-Command lld-link).Source
+          $LLC_VERSION = (& $LLC_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
+          $LLD_VERSION = (& $LLD_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
           "{`"llc`": `"$LLC_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8NoBOM
 
       - uses: actions/upload-artifact@v4
