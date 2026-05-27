@@ -83,7 +83,10 @@ jobs:
       - name: Download LLC and LLD
         shell: pwsh
         run: |
-          choco upgrade llvm
+          choco install llvm -y
+
+      - name: Add LLVM to PATH
+        run: echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
 
       - name: Add LLC and LLD to src dir
         shell: pwsh
