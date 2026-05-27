@@ -84,6 +84,10 @@ jobs:
         shell: pwsh
         run: |
           choco upgrade llvm
+
+      - name: Add LLC and LLD to src dir
+        shell: pwsh
+        run: |
           $LLC_PATH = (Get-Command llc).Source
           $LLD_PATH = (Get-Command lld-link).Source
           Write-Host "LLC: $LLC_PATH"
