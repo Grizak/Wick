@@ -83,7 +83,6 @@ jobs:
       - name: Setup LLVM
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: latest
           directory: ${{ runner.temp }}/llvm
           cached: false
 
