@@ -80,13 +80,12 @@ jobs:
       - name: Cleanup
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
 
-      - name: Download LLC and LLD
-        shell: pwsh
-        run: |
-          choco install llvm -y
-
-      - name: Add LLVM to PATH
-        run: echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
+      - name: Setup LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: latest
+          directory: ${{ runner.temp }}/llvm
+          cached: false
 
       - name: Add LLC and LLD to src dir
         shell: pwsh
