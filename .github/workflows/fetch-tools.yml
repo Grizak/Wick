@@ -90,7 +90,7 @@ jobs:
       - name: Setup LLVM
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: ${{ steps.llvm-version.outputs.version }}
+          version: "20.1.0"
           directory: ${{ runner.temp }}/llvm
           cached: false
 
