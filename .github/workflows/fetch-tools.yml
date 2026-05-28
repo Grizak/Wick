@@ -84,20 +84,20 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANG64
-          install: mingw-w64-x86_64-llvm
+          install: clang-w64-x86_64-llvm
 
       - name: Copy llc and lld
         shell: msys2 {0}
         run: |
           mkdir -p src/tools/bin/windows_amd64/
-          cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
-          cp /mingw64/bin/lld.exe src/tools/bin/windows_amd64/lld-link.exe
+          cp /clang64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
+          cp /clang64/bin/lld.exe src/tools/bin/windows_amd64/lld-link.exe
       
       - name: Write versions
         shell: msys2 {0}
         run: |
-          LLC_VERSION=$(/mingw64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(/mingw64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLC_VERSION=$(/clang64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(/clang64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v4
         with:
