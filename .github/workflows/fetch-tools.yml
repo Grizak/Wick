@@ -98,7 +98,7 @@ jobs:
         shell: pwsh
         run: |
           $LLVM_DIR = "D:\a\_temp\llvm\bin"
-          Get-ChildItem $LLVM_DIR | Select-Object Name
+          Get-ChildItem -Path $env:LLVM_PATH -Recurse -Filter "*.exe" | Select-Object FullName
           New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
           Copy-Item "$LLVM_DIR\llc.exe" src/tools/bin/windows_amd64/llc.exe
           Copy-Item "$LLVM_DIR\lld-link.exe" src/tools/bin/windows_amd64/lld.exe
