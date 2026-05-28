@@ -80,27 +80,27 @@ jobs:
       - name: Cleanup
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
 
-      - name: Download LLC and LLD
-        shell: pwsh
-        run: |
-          choco upgrade llvm
-          $LLC_PATH = (Get-Command llc).Source
-          $LLD_PATH = (Get-Command lld-link).Source
-          Write-Host "LLC: $LLC_PATH"
-          Write-Host "LLD: $LLD_PATH"
-          New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
-          Copy-Item $LLC_PATH src/tools/bin/windows_amd64/llc.exe
-          Copy-Item $LLD_PATH src/tools/bin/windows_amd64/lld.exe
+      - name: Setup msys2 and install llvm
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          install: >
+            mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-lld
 
+      - name: Copy llc and lld
+        shell: msys2 {0}
+        run: |
+          mkdir -p src/tools/bin/windows_amd64/
+          cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
+          cp /mingw64/bin/lld-link.exe src/tools/bin/windows_amd64/lld.exe
+      
       - name: Write versions
-        shell: pwsh
+        shell: msys2 {0}
         run: |
-          $LLC_PATH = (Get-Command llc).Source
-          $LLD_PATH = (Get-Command lld-link).Source
-          $LLC_VERSION = (& $LLC_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
-          $LLD_VERSION = (& $LLD_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
-          "{`"llc`": `"$LLC_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8NoBOM
-
+          LLC_VERSION=$(/mingw64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(/mingw64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v4
         with:
           name: windows-amd64-tools
@@ -144,6 +144,7 @@ jobs:
             git commit -m "chore: update tool binaries"
             git push origin master
             git checkout dev 2>/dev/null || git checkout -b dev
+            git pull origin dev
             git merge master
             git push origin dev
           fi
