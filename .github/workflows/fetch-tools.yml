@@ -89,7 +89,7 @@ jobs:
       - name: Copy llc and lld
         shell: msys2 {0}
         run: |
-          mkdir -p src/tools/windows_amd64/
+          mkdir -p src/tools/bin/windows_amd64/
           cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
           cp /mingw64/bin/lld-link.exe src/tools/bin/windows_amd64/lld.exe
       
