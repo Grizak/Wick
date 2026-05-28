@@ -80,29 +80,18 @@ jobs:
       - name: Cleanup
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
 
-      - name: Get latest LLVM version
-        id: llvm-version
-        shell: pwsh
-        run: |
-          $latest = (Invoke-RestMethod "https://api.github.com/repos/llvm/llvm-project/releases/latest").tag_name -replace 'llvmorg-', ''
-          echo "version=$latest" >> $env:GITHUB_OUTPUT
-
-      - name: Setup LLVM
-        uses: KyleMayes/install-llvm-action@v2
+      - name: Setup msys2 and install llvm
+        uses: msys2/setup-msys2$v2
         with:
-          version: "19.1.7"
-          directory: ${{ runner.temp }}/llvm
-          cached: false
+          msystem: MINGW64
+          install: mingw-w64-x86_64-llvm
 
-      - name: Add LLC and LLD to src dir
-        shell: pwsh
+      - name: Copy llc and lld
+        shell: msys2 {0}
         run: |
-          $LLVM_DIR = "D:\a\_temp\llvm"
-          Get-ChildItem -Path $env:LLVM_PATH -Recurse -Filter "*.exe" | Select-Object FullName
-          New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
-          Copy-Item "$LLVM_DIR\llc.exe" src/tools/bin/windows_amd64/llc.exe
-          Copy-Item "$LLVM_DIR\lld-link.exe" src/tools/bin/windows_amd64/lld.exe
-
+          cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
+          cp /mingw64/bin/lld.exe src/tools/bin/windows_amd64/lld.exe
+      
       - name: Write versions
         shell: pwsh
         run: |
