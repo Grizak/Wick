@@ -97,7 +97,7 @@ jobs:
       - name: Add LLC and LLD to src dir
         shell: pwsh
         run: |
-          $LLVM_DIR = "D:\a\_temp\llvm\bin"
+          $LLVM_DIR = "D:\a\_temp\llvm"
           Get-ChildItem -Path $env:LLVM_PATH -Recurse -Filter "*.exe" | Select-Object FullName
           New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
           Copy-Item "$LLVM_DIR\llc.exe" src/tools/bin/windows_amd64/llc.exe
