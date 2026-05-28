@@ -81,7 +81,7 @@ jobs:
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
 
       - name: Setup msys2 and install llvm
-        uses: msys2/setup-msys2$v2
+        uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           install: mingw-w64-x86_64-llvm
