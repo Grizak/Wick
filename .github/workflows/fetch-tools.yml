@@ -97,8 +97,8 @@ jobs:
       - name: Add LLC and LLD to src dir
         shell: pwsh
         run: |
-          $LLC_PATH = (Get-Command llc).Source
-          $LLD_PATH = (Get-Command lld-link).Source
+          $LLC_PATH = ${{ runner.temp }}/llvm/bin/llc.exe
+          $LLD_PATH = ${{ runner.temp }}/llvm/bin/lld-link.exe
           Write-Host "LLC: $LLC_PATH"
           Write-Host "LLD: $LLD_PATH"
           New-Item -ItemType Directory -Force -Path src/tools/bin/windows_amd64
@@ -108,8 +108,8 @@ jobs:
       - name: Write versions
         shell: pwsh
         run: |
-          $LLC_PATH = (Get-Command llc).Source
-          $LLD_PATH = (Get-Command lld-link).Source
+          $LLC_PATH = ${{ runner.temp }}/llvm/bin/llc.exe
+          $LLD_PATH = ${{ runner.temp }}/llvm/bin/lld-link.exe
           $LLC_VERSION = (& $LLC_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
           $LLD_VERSION = (& $LLD_PATH --version) -replace '.*?(\d+\.\d+(\.\d+)?).*', '$1'
           "{`"llc`": `"$LLC_VERSION`", `"lld`": `"$LLD_VERSION`"}" | Out-File -FilePath src/tools/bin/windows_amd64/versions.json -Encoding utf8NoBOM
