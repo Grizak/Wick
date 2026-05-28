@@ -91,7 +91,7 @@ jobs:
         run: |
           mkdir -p src/tools/bin/windows_amd64/
           cp /clang64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
-          cp /clang64/bin/lld.exe src/tools/bin/windows_amd64/lld-link.exe
+          cp /clang64/bin/lld-link.exe src/tools/bin/windows_amd64/lld.exe
       
       - name: Write versions
         shell: msys2 {0}
