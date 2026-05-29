@@ -13,6 +13,7 @@ type Generator struct {
 	output       strings.Builder
 	nextRegister int
 	nextLabelID  int
+	tmpCount     int
 }
 
 func NewGenerator(root *types.NodeProgram) *Generator {
@@ -20,6 +21,7 @@ func NewGenerator(root *types.NodeProgram) *Generator {
 		root:         root,
 		nextRegister: 0,
 		nextLabelID:  0,
+		tmpCount:     0,
 	}
 
 	return &g
@@ -97,12 +99,16 @@ func (g *Generator) generateExpression(expr types.NodeExpression) string {
 		left := g.generateExpression(expr.BinExpr.Left)
 		right := g.generateExpression(expr.BinExpr.Right)
 
+		result := g.tmpVar()
+
 		reg := g.getRegister()
 		switch expr.BinExpr.Op {
 		case types.BinOpAdd:
-			g.writeLine(fmt.Sprintf(`  %s = add i32 %s, %s`, reg[1:], left, right))
+			g.writeLine(fmt.Sprintf("  %s = add i32 %s, %s", result, left, right))
+		case types.BinOpMul:
+			g.writeLine(fmt.Sprintf("    %s = mul i64 %s, %s", result, left, right))
 		default:
-			panic("unknown operator")
+			panic(fmt.Sprintf("unknown operator: %s", expr.BinExpr.Op))
 		}
 		return reg[1:] // Remove the % prefix since it's already in the register
 	}
@@ -127,8 +133,10 @@ func foldBinExpr(expr *types.NodeBinExpr) int {
 	switch expr.Op {
 	case types.BinOpAdd:
 		return left + right
+	case types.BinOpMul:
+		return left * right
 	default:
-		panic("unknown operator")
+		panic(fmt.Sprintf("unknown operator: %s", expr.Op))
 	}
 }
 
@@ -168,4 +176,9 @@ func entryPoint(target string) string {
 	default:
 		return "_start"
 	}
+}
+
+func (g *Generator) tmpVar() string {
+	g.tmpCount++
+	return fmt.Sprintf("%%tmp%d", g.tmpCount)
 }
