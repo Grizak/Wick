@@ -9,7 +9,7 @@ jobs:
   fetch-linux-amd64:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cleanup
         run: rm -rf src/tools/bin/linux_amd64
@@ -33,7 +33,7 @@ jobs:
           LLD_VERSION=$(ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/linux_amd64/versions.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: linux-amd64-tools
           path: src/tools/bin/linux_amd64/
@@ -41,7 +41,7 @@ jobs:
   fetch-darwin-arm64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cleanup
         run: rm -rf src/tools/bin/darwin_arm64
@@ -67,7 +67,7 @@ jobs:
           LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/darwin_arm64/versions.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: darwin-arm64-tools
           path: src/tools/bin/darwin_arm64/
@@ -75,7 +75,7 @@ jobs:
   fetch-windows-amd64:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cleanup
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/tools/bin/windows_amd64
@@ -103,7 +103,7 @@ jobs:
           LLC_VERSION=$(/mingw64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$(/mingw64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
           path: src/tools/bin/windows_amd64/
@@ -114,40 +114,48 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup git
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout master
+          git checkout -b chore/update-tools
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: linux-amd64-tools
           path: src/tools/bin/linux_amd64/
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: darwin-arm64-tools
           path: src/tools/bin/darwin_arm64/
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: windows-amd64-tools
           path: src/tools/bin/windows_amd64/
 
       - name: Commit binaries
         run: |
+          set -e
           git add src/tools/bin/
           if git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update tool binaries"
-            git push origin master
-            git checkout dev 2>/dev/null || git checkout -b dev
-            git config pull.rebase false
-            git pull origin dev
-            git merge master
-            git push origin dev
+            git commit -m "chore: update tools"
           fi
+
+          git checkout master
+          git pull origin master
+          git merge chore/update-tools
+          git push origin master
+
+          git checkout -b dev --track origin/dev
+          git pull origin dev
+          git merge chore/update-tools
+          git push origin dev
+
+          git branch -D chore/update-tools
