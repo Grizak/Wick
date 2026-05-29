@@ -11,6 +11,8 @@ import (
 
 var tmpDir string
 
+var versions map[string]string
+
 func Init() error {
 	dir, err := cacheDir()
 	if err != nil {
@@ -23,29 +25,26 @@ func Init() error {
 
 	tmpDir = dir
 
-	versions := make(map[string]string)
+	versions = make(map[string]string)
 	if err := json.Unmarshal(versionsJSON, &versions); err != nil {
 		return err
 	}
 
-	lldName := "lld-" + versions["lld"]
-	if runtime.GOOS == "windows" {
-		lldName = lldName + ".exe"
-	}
-
-	nasmName := "nasm-" + versions["nasm"]
-	if runtime.GOOS == "windows" {
-		nasmName = nasmName + ".exe"
-	}
-
 	for _, b := range []struct {
+		dir  string
 		name string
 		data []byte
 	}{
-		{nasmName, nasmBinary},
-		{lldName, lldBinary},
+		{llcCacheDir(), llcBinaryName(), llcBinary},
+		{lldCacheDir(), lldBinaryName(), lldBinary},
 	} {
-		path := filepath.Join(tmpDir, b.name)
+		path := filepath.Join(b.dir, b.name)
+		if _, err := os.Stat(path); err == nil {
+			continue // already cached
+		}
+		if err := os.MkdirAll(b.dir, 0755); err != nil {
+			return err
+		}
 		if err := os.WriteFile(path, b.data, 0755); err != nil {
 			return err
 		}
@@ -53,15 +52,38 @@ func Init() error {
 	return nil
 }
 
-func NasmPath() string {
-	return toolsPath("nasm")
+func lldCacheDir() string {
+	return filepath.Join(tmpDir, "lld-"+versions["lld"])
+}
+
+func llcCacheDir() string {
+	return filepath.Join(tmpDir, "llc-"+versions["llc"])
 }
 
 func LldPath() string {
-	if runtime.GOOS == "windows" {
-		return toolsPath("lld.exe")
+	return filepath.Join(lldCacheDir(), lldBinaryName())
+}
+
+func LlcPath() string {
+	return filepath.Join(llcCacheDir(), llcBinaryName())
+}
+
+func lldBinaryName() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "lld-link.exe"
+	case "darwin":
+		return "ld64.lld"
+	default:
+		return "ld.lld"
 	}
-	return toolsPath("lld")
+}
+
+func llcBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "llc.exe"
+	}
+	return "llc"
 }
 
 func toolsPath(name string) string {
@@ -71,8 +93,8 @@ func toolsPath(name string) string {
 	return filepath.Join(tmpDir, name)
 }
 
-func ExecuteCommand(cmd string) error {
-	c := exec.Command("/bin/sh", "-c", cmd)
+func ExecuteCommand(name string, args ...string) error {
+	c := exec.Command(name, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()

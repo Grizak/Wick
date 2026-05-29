@@ -5,6 +5,7 @@ $$
   \begin{cases}
     \text{exit}([\text{Expr}])
   \end{cases} \\
-  [\text{Expr}] &\to \text{int\_lit}
+  [\text{Expr}] &\to [\text{Term}] ([+] [\text{Term}])^* \\
+  [\text{Term}] &\to \text{int\_lit}
 \end{align}
 $$
