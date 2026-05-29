@@ -153,7 +153,7 @@ jobs:
           git merge chore/update-tools
           git push origin master
 
-          git checkout -b dev --track origin/dev
+          git checkout -b dev
           git pull origin dev
           git merge chore/update-tools
           git push origin dev
