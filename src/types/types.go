@@ -8,6 +8,7 @@ const (
 	TokenCloseParen TokenType = ")"
 	TokenIntLit     TokenType = "int_lit"
 	TokenEOF        TokenType = "eof"
+	TokenPlus       TokenType = "+"
 )
 
 type Token struct {
@@ -29,11 +30,16 @@ type NodeExit struct {
 }
 
 type NodeExpression struct {
-	IntLit int
+	BinExpr *NodeBinExpr
+	IntLit  *int
 }
 
-type Backend interface {
-	Generate(program NodeProgram, outFile string) error
-	Assemble(asmFile, objFile string, save bool) error
-	Link(objFiles []string, outFile string, save bool) error
+type NodeBinExpr struct {
+	Left  NodeExpression
+	Op    BinOp
+	Right NodeExpression
 }
+
+type BinOp string
+
+const BinOpAdd BinOp = "+"

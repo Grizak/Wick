@@ -6,24 +6,45 @@ import (
 	"github.com/Grizak/Wick/src/types"
 )
 
-type Parser struct{}
+type Parser struct {
+	input  chan types.Token
+	buffer []types.Token
+}
 
 func NewParser() *Parser {
-	p := Parser{}
+	return &Parser{}
+}
 
-	return &p
+func (p *Parser) peek(offset int) types.Token {
+	// Fill buffer up to offset+1
+	for len(p.buffer) <= offset {
+		p.buffer = append(p.buffer, <-p.input)
+	}
+	return p.buffer[offset]
+}
+
+func (p *Parser) consume() types.Token {
+	// Make sure buffer has at least one token
+	if len(p.buffer) == 0 {
+		return <-p.input
+	}
+
+	token := p.buffer[0]
+	p.buffer = p.buffer[1:]
+	return token
 }
 
 // Read from input, block when input is empty
 func (p *Parser) Parse(input chan types.Token) types.NodeProgram {
 	var program types.NodeProgram
+	p.input = input
 
 	for {
-		token := <-input
+		token := p.consume()
 
 		switch token.Type {
 		case types.TokenExit:
-			program.Statements = append(program.Statements, types.NodeStatement{Exit: p.parseExit(input)})
+			program.Statements = append(program.Statements, types.NodeStatement{Exit: p.parseExit()})
 		case types.TokenOpenParen:
 			panic("unexpected `(`")
 		case types.TokenCloseParen:
@@ -38,30 +59,50 @@ func (p *Parser) Parse(input chan types.Token) types.NodeProgram {
 	}
 }
 
-func (p *Parser) parseExit(input chan types.Token) *types.NodeExit {
+func (p *Parser) parseExit() *types.NodeExit {
 	var exit types.NodeExit
 
-	token := <-input
+	token := p.consume()
 	// Expect an `OpenParen`, then `int_lit`, then `CloseParen`
 	if token.Type != types.TokenOpenParen {
 		panic("expected `(`")
 	}
+	exit.Expr = p.parseExpression()
 
-	token = <-input
-	if token.Type != types.TokenIntLit {
-		panic("expected int literal")
-	}
-
-	i, err := strconv.Atoi(*token.Value)
-	if err != nil {
-		panic("invalid int literal")
-	}
-	exit.Expr.IntLit = i
-
-	token = <-input
+	token = p.consume()
 	if token.Type != types.TokenCloseParen {
 		panic("expected `)`")
 	}
 
 	return &exit
+}
+
+func (p *Parser) parseExpression() types.NodeExpression {
+	term := p.parseTerm()
+
+	if p.peek(0).Type == types.TokenPlus {
+		p.consume()
+		right := p.parseExpression()
+		return types.NodeExpression{
+			BinExpr: &types.NodeBinExpr{
+				Left:  term,
+				Op:    types.BinOpAdd,
+				Right: right,
+			},
+		}
+	}
+
+	return term
+}
+
+func (p *Parser) parseTerm() types.NodeExpression {
+	token := p.consume()
+	if token.Type != types.TokenIntLit {
+		panic("expected int literal")
+	}
+	i, err := strconv.Atoi(*token.Value)
+	if err != nil {
+		panic("invalid int literal")
+	}
+	return types.NodeExpression{IntLit: &i}
 }
