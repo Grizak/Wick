@@ -1,5 +1,5 @@
 build
 .vscode
-output
-*.asm
+out
+*.ll
 *.o
