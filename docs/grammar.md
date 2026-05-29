@@ -6,6 +6,7 @@ $$
     \text{exit}([\text{Expr}])
   \end{cases} \\
   [\text{Expr}] &\to [\text{Term}] ([+] [\text{Term}])^* \\
-  [\text{Term}] &\to \text{int\_lit}
+  [\text{Term}] &\to [\text{Factor}] ([*] [\text{Factor}])^* \\
+  [\text{Factor}] &\to \text{int\_lit}
 \end{align}
 $$
