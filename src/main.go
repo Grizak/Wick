@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Grizak/Wick/src/backend"
@@ -80,7 +81,7 @@ func main() {
 			output := make(chan types.Token, 4096)
 			go tokenizer.Tokenize(output)
 
-			parser := parser.NewParser()
+			parser := parser.NewParser(filepath.Base(input))
 			program := parser.Parse(output)
 
 			outputFile := args.Output + "_" + string(randchars.LowerAlpha(8))
