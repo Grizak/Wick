@@ -154,8 +154,8 @@ jobs:
           git merge --no-ff chore/update-tools
           git push origin master
 
+          git fetch origin dev
           git checkout -b dev
-          git pull --no-rebase origin dev
           git merge --no-ff chore/update-tools
           git push origin dev
 
