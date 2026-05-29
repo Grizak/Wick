@@ -9,12 +9,16 @@ import (
 type Tokenizer struct {
 	content string
 	index   int
+	line    int
+	column  int
 }
 
 func NewTokenizer(content string) *Tokenizer {
 	t := Tokenizer{
 		content: content,
 		index:   0,
+		line:    1,
+		column:  1,
 	}
 
 	return &t
@@ -26,22 +30,26 @@ func (t *Tokenizer) Tokenize(output chan types.Token) {
 		r := t.peek(0)
 
 		if r == 0 {
-			output <- types.Token{Type: types.TokenEOF, Line: t.line()}
+			output <- types.Token{Type: types.TokenEOF, Pos: t.pos()}
 			break
 		}
 
 		switch types.TokenType(r) {
 		case types.TokenOpenParen:
 			t.consume()
-			output <- types.Token{Type: types.TokenOpenParen, Line: t.line()}
+			output <- types.Token{Type: types.TokenOpenParen, Pos: t.pos()}
 			continue
 		case types.TokenCloseParen:
 			t.consume()
-			output <- types.Token{Type: types.TokenCloseParen, Line: t.line()}
+			output <- types.Token{Type: types.TokenCloseParen, Pos: t.pos()}
 			continue
 		case types.TokenPlus:
 			t.consume()
-			output <- types.Token{Type: types.TokenPlus, Line: t.line()}
+			output <- types.Token{Type: types.TokenPlus, Pos: t.pos()}
+			continue
+		case types.TokenStar:
+			t.consume()
+			output <- types.Token{Type: types.TokenStar, Pos: t.pos()}
 			continue
 		default:
 			// Check if it's whitespace
@@ -74,12 +82,12 @@ func (t *Tokenizer) Tokenize(output chan types.Token) {
 			if isNumber {
 				// We have a number
 				str := string(buffer)
-				output <- types.Token{Type: types.TokenIntLit, Value: &str, Line: t.line()}
+				output <- types.Token{Type: types.TokenIntLit, Value: &str, Pos: t.pos()}
 			} else {
 				// Check if it's a keyword
 				switch string(buffer) {
 				case "exit":
-					output <- types.Token{Type: types.TokenExit, Line: t.line()}
+					output <- types.Token{Type: types.TokenExit, Pos: t.pos()}
 				default: // Identifier
 					panic("Not implemented: identifiers")
 				}
@@ -104,16 +112,21 @@ func (t *Tokenizer) consume() rune {
 
 	r := rune(t.content[t.index])
 	t.index++
+
+	if r == '\n' {
+		t.line++
+		t.column = 1
+	} else {
+		t.column++
+	}
+
 	return r
 }
 
-func (t *Tokenizer) line() int {
-	line := 1
-	for i := 0; i < t.index; i++ {
-		if t.content[i] == '\n' {
-			line++
-		}
+func (t *Tokenizer) pos() types.Position {
+	return types.Position{
+		Line:   t.line,
+		Column: t.column,
+		Index:  t.index,
 	}
-
-	return line
 }
