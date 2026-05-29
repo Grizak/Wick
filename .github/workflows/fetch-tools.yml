@@ -121,6 +121,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config pull.rebase false
           git checkout -b chore/update-tools
 
       - uses: actions/download-artifact@v6
@@ -149,13 +150,13 @@ jobs:
           fi
 
           git checkout master
-          git pull origin master
-          git merge chore/update-tools
+          git pull --no-rebase origin master
+          git merge --no-ff chore/update-tools
           git push origin master
 
           git checkout -b dev
-          git pull origin dev
-          git merge chore/update-tools
+          git pull --no-rebase origin dev
+          git merge --no-ff chore/update-tools
           git push origin dev
 
           git branch -D chore/update-tools
