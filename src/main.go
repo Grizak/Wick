@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"sync"
 
-	"github.com/Grizak/Wick/src/backends"
+	"github.com/Grizak/Wick/src/backend"
+	"github.com/Grizak/Wick/src/generator"
 	"github.com/Grizak/Wick/src/parser"
 	"github.com/Grizak/Wick/src/tokenizer"
 	"github.com/Grizak/Wick/src/tools"
@@ -28,7 +30,16 @@ func (Args) Version() string {
 
 var args Args
 
-// Parse args to get input file, then read input file, tokenize it, parse it, generate asm and write it to a file, pass it to nasm and ld
+var TargetTriples = map[string]string{
+	"linux/amd64":   "x86_64-pc-linux-gnu",
+	"linux/arm64":   "aarch64-pc-linux-gnu",
+	"darwin/amd64":  "x86_64-apple-macosx",
+	"darwin/arm64":  "aarch64-apple-macosx",
+	"windows/amd64": "x86_64-pc-windows-msvc",
+	"windows/arm64": "aarch64-pc-windows-msvc",
+}
+
+// Parse args to get input file, then read input file, tokenize it, parse it, generate llvm ir and write it to a file, pass it to llc and lld
 func main() {
 	arg.MustParse(&args)
 
@@ -41,40 +52,75 @@ func main() {
 		}
 	}
 
-	var generatedFiles []string
+	generatedFiles := make([]string, len(args.Input))
 
 	tools.Init()
 
-	backend, err := backends.New(args.Target)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s: %s\n", "failed to create backend", args.Target, err.Error())
-		os.Exit(1)
+	type result struct {
+		index      int
+		outputFile string
+		err        error
 	}
+
+	results := make(chan result, len(args.Input))
+	var wg sync.WaitGroup
 
 	for i := range args.Input {
-		input := args.Input[i]
+		wg.Add(1)
+		go func(input string, index int) {
+			defer wg.Done()
 
-		content, err := os.ReadFile(input)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s %s: %s\n", "failed to read input file", input, err.Error())
-			os.Exit(1)
-		}
+			content, err := os.ReadFile(input)
+			if err != nil {
+				results <- result{err: fmt.Errorf("failed to read input file %s: %w", input, err)}
+				return
+			}
 
-		tokenizer := tokenizer.NewTokenizer(string(content))
-		output := make(chan types.Token, 4096)
-		tokenizer.Tokenize(output)
+			tokenizer := tokenizer.NewTokenizer(string(content))
+			output := make(chan types.Token, 4096)
+			go tokenizer.Tokenize(output)
 
-		parser := parser.NewParser()
-		program := parser.Parse(output)
+			parser := parser.NewParser()
+			program := parser.Parse(output)
 
-		outputFile := args.Output + "_" + string(randchars.LowerAlpha(8))
+			outputFile := args.Output + "_" + string(randchars.LowerAlpha(8))
 
-		backend.Generate(program, outputFile+".asm")
+			generator := generator.NewGenerator(&program)
+			targetTriple, ok := types.TargetTriples[args.Target]
+			if !ok {
+				results <- result{err: fmt.Errorf("unsupported target: %s", args.Target)}
+				return
+			}
+			ir := generator.Generate(input, targetTriple)
 
-		backend.Assemble(outputFile+".asm", outputFile+".o", args.SaveIntermediaries)
+			if err := os.WriteFile(outputFile+".ll", []byte(ir), 0644); err != nil {
+				results <- result{err: fmt.Errorf("failed to write LLVM IR to file for %s: %w", input, err)}
+				return
+			}
 
-		generatedFiles = append(generatedFiles, outputFile+".o")
+			if err := backend.Assemble(outputFile+".ll", outputFile+".o", args.SaveIntermediaries); err != nil {
+				results <- result{err: fmt.Errorf("assemble failed for %s: %w", input, err)}
+				return
+			}
+
+			results <- result{outputFile: outputFile + ".o", index: index}
+		}(args.Input[i], i)
 	}
 
-	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries)
+	// Close results once all goroutines finish
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results and handle errors
+	for r := range results {
+		if r.err != nil {
+			fmt.Fprintln(os.Stderr, r.err)
+			os.Exit(1)
+		}
+		generatedFiles[r.index] = r.outputFile
+	}
+
+	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries, types.TargetTriples[args.Target])
 }

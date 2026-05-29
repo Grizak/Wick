@@ -39,6 +39,10 @@ func (t *Tokenizer) Tokenize(output chan types.Token) {
 			t.consume()
 			output <- types.Token{Type: types.TokenCloseParen, Line: t.line()}
 			continue
+		case types.TokenPlus:
+			t.consume()
+			output <- types.Token{Type: types.TokenPlus, Line: t.line()}
+			continue
 		default:
 			// Check if it's whitespace
 			if unicode.IsSpace(r) {
