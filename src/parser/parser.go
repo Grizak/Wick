@@ -1,18 +1,22 @@
 package parser
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/Grizak/Wick/src/types"
 )
 
 type Parser struct {
-	input  chan types.Token
-	buffer []types.Token
+	input    chan types.Token
+	buffer   []types.Token
+	filename string
 }
 
-func NewParser() *Parser {
-	return &Parser{}
+func NewParser(filename string) *Parser {
+	return &Parser{
+		filename: filename,
+	}
 }
 
 func (p *Parser) peek(offset int) types.Token {
@@ -60,21 +64,11 @@ func (p *Parser) Parse(input chan types.Token) types.NodeProgram {
 }
 
 func (p *Parser) parseExit() *types.NodeExit {
-	var exit types.NodeExit
+	p.expect(types.TokenOpenParen)
+	expr := p.parseExpression()
+	p.expect(types.TokenCloseParen)
 
-	token := p.consume()
-	// Expect an `OpenParen`, then `int_lit`, then `CloseParen`
-	if token.Type != types.TokenOpenParen {
-		panic("expected `(`")
-	}
-	exit.Expr = p.parseExpression()
-
-	token = p.consume()
-	if token.Type != types.TokenCloseParen {
-		panic("expected `)`")
-	}
-
-	return &exit
+	return &types.NodeExit{Expr: expr}
 }
 
 func (p *Parser) parseExpression() types.NodeExpression {
@@ -96,13 +90,39 @@ func (p *Parser) parseExpression() types.NodeExpression {
 }
 
 func (p *Parser) parseTerm() types.NodeExpression {
-	token := p.consume()
-	if token.Type != types.TokenIntLit {
-		panic("expected int literal")
+	factor := p.parseFactor()
+
+	if p.peek(0).Type == types.TokenStar {
+		p.consume()
+		right := p.parseTerm()
+		return types.NodeExpression{
+			BinExpr: &types.NodeBinExpr{
+				Left:  factor,
+				Op:    types.BinOpMul,
+				Right: right,
+			},
+		}
 	}
+	return factor
+}
+
+func (p *Parser) parseFactor() types.NodeExpression {
+	token := p.expect(types.TokenIntLit)
 	i, err := strconv.Atoi(*token.Value)
 	if err != nil {
-		panic("invalid int literal")
+		p.panic("invalid int literal", token)
 	}
 	return types.NodeExpression{IntLit: &i}
+}
+
+func (p *Parser) panic(err string, token types.Token) {
+	panic(fmt.Sprintf("%s:%d:%d: %s", p.filename, token.Pos.Line, token.Pos.Column, err))
+}
+
+func (p *Parser) expect(tokenType types.TokenType) types.Token {
+	token := p.consume()
+	if token.Type != tokenType {
+		p.panic(fmt.Sprintf("expected `%s` but got `%s`", tokenType, token.Type), token)
+	}
+	return token
 }
