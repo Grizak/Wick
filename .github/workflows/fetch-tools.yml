@@ -146,6 +146,7 @@ jobs:
             git commit -m "chore: update tool binaries"
             git push origin master
             git checkout dev 2>/dev/null || git checkout -b dev
+            git config pull.rebase false
             git pull origin dev
             git merge master
             git push origin dev
