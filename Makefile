@@ -11,3 +11,4 @@ all:
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm *.ll *.o
