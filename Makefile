@@ -1,13 +1,14 @@
 GO = go
 BUILD_DIR = build
-TARGET = $(BUILD_DIR)/wickc
+TARGET ?= wickc
+TARGET_FULL = $(BUILD_DIR)/$(TARGET)
 SOURCES = src/main.go
 
 .PHONY: all clean
 
 all:
 	mkdir -p $(BUILD_DIR)
-	$(GO) build -ldflags "-X main.version=$(shell git describe --tags --abbrev=0)" -o $(TARGET) $(SOURCES)
+	$(GO) build -ldflags "-X main.version=$(shell git describe --tags --abbrev=0)" -o $(TARGET_FULL) $(SOURCES)
 
 clean:
 	rm -rf $(BUILD_DIR) 2>/dev/null
