@@ -2,7 +2,6 @@ package tools
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,13 +83,6 @@ func llcBinaryName() string {
 		return "llc.exe"
 	}
 	return "llc"
-}
-
-func toolsPath(name string) string {
-	if tmpDir == "" {
-		log.Fatal("tools.Init() has not been called")
-	}
-	return filepath.Join(tmpDir, name)
 }
 
 func ExecuteCommand(name string, args ...string) error {
