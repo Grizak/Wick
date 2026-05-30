@@ -92,6 +92,14 @@ jobs:
             python3
             mingw-w64-x86_64-llvm
 
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: llvm-project/build
+          key: llvm-build-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            llvm-build-${{ runner.os }}-
+
       - name: Build llc and lld statically
         shell: msys2 {0}
         run: |
