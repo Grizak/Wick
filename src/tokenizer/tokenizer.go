@@ -20,6 +20,8 @@ var singleCharTokens = map[rune]types.TokenType{
 	'-': types.TokenMinus,
 	'*': types.TokenStar,
 	'/': types.TokenFSlash,
+	':': types.TokenColon,
+	'=': types.TokenEquals,
 }
 
 func NewTokenizer(content string) *Tokenizer {
@@ -71,15 +73,20 @@ func (t *Tokenizer) Tokenize(output chan types.Token) {
 			}
 		}
 
+		str := string(buffer)
+
 		if isNumber {
-			str := string(buffer)
 			output <- types.Token{Type: types.TokenIntLit, Value: &str, Pos: t.pos()}
 		} else {
 			switch string(buffer) {
 			case "exit":
 				output <- types.Token{Type: types.TokenExit, Pos: t.pos()}
+			case "const":
+				output <- types.Token{Type: types.TokenConst, Pos: t.pos()}
+			case "let":
+				output <- types.Token{Type: types.TokenLet, Pos: t.pos()}
 			default:
-				panic("not implemented: identifiers")
+				output <- types.Token{Type: types.TokenIdent, Value: &str, Pos: t.pos()}
 			}
 		}
 	}
