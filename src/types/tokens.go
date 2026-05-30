@@ -10,16 +10,18 @@ const (
 	TokenEOF        TokenType = "eof"
 	TokenPlus       TokenType = "+"
 	TokenStar       TokenType = "*"
+	TokenMinus      TokenType = "-"
+	TokenFSlash     TokenType = "/"
 )
 
 type Token struct {
 	Type  TokenType
 	Value *string
-	Pos Position
+	Pos   Position
 }
 
 type Position struct {
-	Line int
+	Line   int
 	Column int
-	Index int
+	Index  int
 }

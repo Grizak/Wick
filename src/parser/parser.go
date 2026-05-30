@@ -74,13 +74,24 @@ func (p *Parser) parseExit() *types.NodeExit {
 func (p *Parser) parseExpression() types.NodeExpression {
 	term := p.parseTerm()
 
-	if p.peek(0).Type == types.TokenPlus {
+	switch p.peek(0).Type {
+	case types.TokenPlus:
 		p.consume()
 		right := p.parseExpression()
 		return types.NodeExpression{
 			BinExpr: &types.NodeBinExpr{
 				Left:  term,
 				Op:    types.BinOpAdd,
+				Right: right,
+			},
+		}
+	case types.TokenMinus:
+		p.consume()
+		right := p.parseExpression()
+		return types.NodeExpression{
+			BinExpr: &types.NodeBinExpr{
+				Left:  term,
+				Op:    types.BinOpSub,
 				Right: right,
 			},
 		}
@@ -92,7 +103,8 @@ func (p *Parser) parseExpression() types.NodeExpression {
 func (p *Parser) parseTerm() types.NodeExpression {
 	factor := p.parseFactor()
 
-	if p.peek(0).Type == types.TokenStar {
+	switch p.peek(0).Type {
+	case types.TokenStar:
 		p.consume()
 		right := p.parseTerm()
 		return types.NodeExpression{
@@ -102,12 +114,31 @@ func (p *Parser) parseTerm() types.NodeExpression {
 				Right: right,
 			},
 		}
+	case types.TokenFSlash:
+		p.consume()
+		right := p.parseTerm()
+		return types.NodeExpression{
+			BinExpr: &types.NodeBinExpr{
+				Left:  factor,
+				Op:    types.BinOpDiv,
+				Right: right,
+			},
+		}
 	}
 	return factor
 }
 
 func (p *Parser) parseFactor() types.NodeExpression {
-	token := p.expect(types.TokenIntLit)
+	token := p.peek(0)
+
+	if token.Type == types.TokenOpenParen {
+		p.consume()
+		expr := p.parseExpression()
+		p.expect(types.TokenCloseParen)
+		return expr
+	}
+
+	token = p.expect(types.TokenIntLit)
 	i, err := strconv.Atoi(*token.Value)
 	if err != nil {
 		p.panic("invalid int literal", token)

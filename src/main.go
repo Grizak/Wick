@@ -91,7 +91,7 @@ func main() {
 				return
 			}
 
-			if err := backend.Assemble(outputFile+".ll", outputFile+".o", args.SaveIntermediaries); err != nil {
+			if err := backend.Assemble(outputFile+".ll", outputFile+".o", args.Output, args.SaveIntermediaries, index); err != nil {
 				results <- result{err: fmt.Errorf("assemble failed for %s: %w", input, err)}
 				return
 			}
