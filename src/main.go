@@ -74,7 +74,10 @@ func main() {
 			go tokenizer.Tokenize(output)
 
 			parser := parser.NewParser(filepath.Base(input))
-			program := parser.Parse(output)
+			program, err := parser.Parse(output)
+			if err != nil {
+				results <- result{err: err}
+			}
 
 			outputFile := args.Output + "_" + string(randchars.LowerAlpha(8))
 
@@ -84,7 +87,12 @@ func main() {
 				results <- result{err: fmt.Errorf("unsupported target: %s", args.Target)}
 				return
 			}
-			ir := generator.Generate(input, targetTriple)
+			ir, err := generator.Generate(input, targetTriple)
+
+			if err != nil {
+				results <- result{err: err}
+				return
+			}
 
 			if err := os.WriteFile(outputFile+".ll", []byte(ir), 0644); err != nil {
 				results <- result{err: fmt.Errorf("failed to write LLVM IR to file for %s: %w", input, err)}
