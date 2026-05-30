@@ -91,7 +91,6 @@ jobs:
             clang
             python3
             mingw-w64-x86_64-llvm
-            mingw-w64-x86_64-lld
 
       - name: Build llc and lld statically
         shell: msys2 {0}
@@ -112,7 +111,7 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc lld-link
+          ninja -C build llc lld
           mkdir -p ../src/tools/bin/windows_amd64
           cp build/bin/llc.exe ../src/tools/bin/windows_amd64/llc.exe
           cp build/bin/lld-link.exe ../src/tools/bin/windows_amd64/lld-link.exe
