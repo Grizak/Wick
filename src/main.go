@@ -31,16 +31,8 @@ func (Args) Version() string {
 
 var args Args
 
-var TargetTriples = map[string]string{
-	"linux/amd64":   "x86_64-pc-linux-gnu",
-	"linux/arm64":   "aarch64-pc-linux-gnu",
-	"darwin/amd64":  "x86_64-apple-macosx",
-	"darwin/arm64":  "aarch64-apple-macosx",
-	"windows/amd64": "x86_64-pc-windows-msvc",
-	"windows/arm64": "aarch64-pc-windows-msvc",
-}
-
-// Parse args to get input file, then read input file, tokenize it, parse it, generate llvm ir and write it to a file, pass it to llc and lld
+// Parse args to get input file, then read input file, tokenize it, parse it,
+// generate llvm ir and write it to a file, pass it to llc and lld
 func main() {
 	arg.MustParse(&args)
 
@@ -114,13 +106,20 @@ func main() {
 		close(results)
 	}()
 
+	errCounter := 0
+
 	// Collect results and handle errors
 	for r := range results {
 		if r.err != nil {
 			fmt.Fprintln(os.Stderr, r.err)
-			os.Exit(1)
+			errCounter++
+		} else {
+			generatedFiles[r.index] = r.outputFile
 		}
-		generatedFiles[r.index] = r.outputFile
+	}
+
+	if errCounter > 0 {
+		os.Exit(1)
 	}
 
 	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries, types.TargetTriples[args.Target])
