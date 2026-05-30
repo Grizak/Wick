@@ -85,23 +85,52 @@ jobs:
         with:
           msystem: CLANG64
           install: >
+            git
+            cmake
+            ninja
+            clang
+            python3
             mingw-w64-x86_64-llvm
-            mingw-w64-x86_64-lld
 
-      - name: Copy llc and lld
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: llvm-project/build
+          key: llvm-build-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            llvm-build-${{ runner.os }}-
+
+      - name: Build llc and lld statically
         shell: msys2 {0}
         run: |
-          mkdir -p src/tools/bin/windows_amd64/
-          cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
-          cp /mingw64/bin/lld-link.exe src/tools/bin/windows_amd64/lld-link.exe
-          chmod +x src/tools/bin/windows_amd64/llc.exe
-          chmod +x src/tools/bin/windows_amd64/lld-link.exe
+          git clone --depth 1 https://github.com/llvm/llvm-project.git
+          cd llvm-project
+          cmake -S llvm -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_ASM_COMPILER=clang \
+            -DLLVM_BUILD_STATIC=ON \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_ENABLE_PROJECTS="lld" \
+            -DLLVM_TOOLCHAIN_TOOLS="llc;lld-link" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF
+          ninja -C build llc lld
+          mkdir -p ../src/tools/bin/windows_amd64
+          cp build/bin/llc.exe ../src/tools/bin/windows_amd64/llc.exe
+          cp build/bin/lld-link.exe ../src/tools/bin/windows_amd64/lld-link.exe
+          chmod +x ../src/tools/bin/windows_amd64/llc.exe
+          chmod +x ../src/tools/bin/windows_amd64/lld-link.exe
 
       - name: Write versions
         shell: msys2 {0}
         run: |
-          LLC_VERSION=$(/mingw64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(/mingw64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLC_VERSION=$(src/tools/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(src/tools/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v6
         with:
@@ -148,15 +177,14 @@ jobs:
           else
             git commit -m "chore: update tools"
           fi
-
+          
           git checkout master
           git pull --no-rebase origin master
           git merge --no-ff chore/update-tools
           git push origin master
-
+          
           git fetch origin dev
-          git checkout -b dev
+          git checkout -b dev origin/dev
           git merge --no-ff chore/update-tools
-          git pull --rebase origin dev
           git push origin dev
           git branch -D chore/update-tools
