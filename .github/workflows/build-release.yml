@@ -14,9 +14,9 @@ jobs:
       - name: Build
         run: |
           set -e
-          GOARCH=amd64 GOOS=linux make TARGET=wickc-linux_amd64-${GITHUB_REF}
-          GOARCH=amd64 GOOS=windows make TARGET=wickc-windows_amd64-${GITHUB_REF}
-          GOARCH=arm64 GOOS=darwin make TARGET=wickc-darwin-arm64-${GITHUB_REF}
+          GOARCH=amd64 GOOS=linux make TARGET=wickc-linux_amd64-${GITHUB_REF_NAME}
+          GOARCH=amd64 GOOS=windows make TARGET=wickc-windows_amd64-${GITHUB_REF_NAME}
+          GOARCH=arm64 GOOS=darwin make TARGET=wickc-darwin-arm64-${GITHUB_REF_NAME}
 
       - uses: actions/upload-artifact@v6
         with:
