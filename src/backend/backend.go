@@ -1,12 +1,13 @@
 package backend
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/Grizak/Wick/src/tools"
 )
 
-func Assemble(asmFile, objFile string, save bool) error {
+func Assemble(asmFile, objFile, outFile string, save bool, idx int) error {
 	llcPath := tools.LlcPath()
 
 	err := tools.ExecuteCommand(llcPath, "-filetype=obj", asmFile, "-o", objFile)
@@ -16,6 +17,10 @@ func Assemble(asmFile, objFile string, save bool) error {
 
 	if !save {
 		if err := os.Remove(asmFile); err != nil {
+			return err
+		}
+	} else {
+		if err := os.Rename(asmFile, outFile+fmt.Sprint(idx)+".ll"); err != nil {
 			return err
 		}
 	}
@@ -42,6 +47,12 @@ func Link(objFiles []string, outFile string, save bool, target string) error {
 	if !save {
 		for _, objFile := range objFiles {
 			if err := os.Remove(objFile); err != nil {
+				return err
+			}
+		}
+	} else {
+		for counter, objFile := range objFiles {
+			if err := os.Rename(objFile, outFile+fmt.Sprint(counter)+".o"); err != nil {
 				return err
 			}
 		}
