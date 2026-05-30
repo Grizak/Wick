@@ -7,11 +7,16 @@ const (
 	TokenOpenParen  TokenType = "("
 	TokenCloseParen TokenType = ")"
 	TokenIntLit     TokenType = "int_lit"
-	TokenEOF        TokenType = "eof"
+	TokenEOF        TokenType = "eof" // Not actual token name
 	TokenPlus       TokenType = "+"
 	TokenStar       TokenType = "*"
 	TokenMinus      TokenType = "-"
 	TokenFSlash     TokenType = "/"
+	TokenIdent      TokenType = "ident"
+	TokenConst      TokenType = "const"
+	TokenLet        TokenType = "let"
+	TokenColon      TokenType = ":"
+	TokenEquals     TokenType = "="
 )
 
 type Token struct {
