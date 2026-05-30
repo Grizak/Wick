@@ -86,22 +86,43 @@ jobs:
           msystem: CLANG64
           install: >
             mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-clang
             mingw-w64-x86_64-lld
 
-      - name: Copy llc and lld
+      - name: Build llc statically
         shell: msys2 {0}
         run: |
-          mkdir -p src/tools/bin/windows_amd64/
-          cp /mingw64/bin/llc.exe src/tools/bin/windows_amd64/llc.exe
-          cp /mingw64/bin/lld-link.exe src/tools/bin/windows_amd64/lld-link.exe
-          chmod +x src/tools/bin/windows_amd64/llc.exe
-          chmod +x src/tools/bin/windows_amd64/lld-link.exe
+          git clone --depth 1 https://github.com/llvm/llvm-project.git
+          cd llvm-project
+          cmake -S llvm -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_BUILD_STATIC=ON \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_ENABLE_PROJECTS="lld" \
+            -DLLVM_TOOLCHAIN_TOOLS="llc;lld-link" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF
+          ninja -C build llc lld-link
+          mkdir -p ../src/tools/bin/windows_amd64
+          cp build/bin/llc.exe ../src/tools/bin/windows_amd64/llc.exe
+          cp build/bin/lld-link.exe ../src/tools/bin/windows_amd64/lld-link.exe
+          chmod +x ../src/tools/bin/windows_amd64/llc.exe
+          chmod +x ../src/tools/bin/windows_amd64/lld-link.exe
+
+      - name: Copy lld
+        shell: msys2 {0}
+        run: |
 
       - name: Write versions
         shell: msys2 {0}
         run: |
-          LLC_VERSION=$(/mingw64/bin/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(/mingw64/bin/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLC_VERSION=$(src/tools/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(src/tools/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/tools/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v6
         with:
