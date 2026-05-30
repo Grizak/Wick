@@ -39,121 +39,241 @@ func (p *Parser) consume() types.Token {
 }
 
 // Read from input, block when input is empty
-func (p *Parser) Parse(input chan types.Token) types.NodeProgram {
+func (p *Parser) Parse(input chan types.Token) (types.NodeProgram, error) {
 	var program types.NodeProgram
 	p.input = input
 
 	for {
-		token := p.consume()
+		token := p.peek(0)
 
 		switch token.Type {
 		case types.TokenExit:
-			program.Statements = append(program.Statements, types.NodeStatement{Exit: p.parseExit()})
+			p.consume()
+			exit, err := p.parseExit()
+			if err != nil {
+				return program, err
+			}
+			program.Statements = append(program.Statements, types.NodeStatement{Exit: exit})
+		case types.TokenConst:
+			p.consume()
+			varDecl, err := p.parseVarDecl(true)
+			if err != nil {
+				return program, err
+			}
+			program.Statements = append(program.Statements, types.NodeStatement{VarDecl: varDecl})
+		case types.TokenIdent:
+			// Peek ahead to disambiguate
+			next := p.peek(1)
+			if next.Type == types.TokenEquals {
+				varAssign, err := p.parseVarAssign()
+				if err != nil {
+					return program, err
+				}
+				program.Statements = append(program.Statements, types.NodeStatement{VarAssign: varAssign})
+			} else {
+				p.error("expected `=` after identifier", token)
+			}
+		case types.TokenLet:
+			p.consume()
+			varDecl, err := p.parseVarDecl(false)
+			if err != nil {
+				return program, err
+			}
+			program.Statements = append(program.Statements, types.NodeStatement{VarDecl: varDecl})
 		case types.TokenOpenParen:
-			panic("unexpected `(`")
+			p.error("unexpected `(`", token)
 		case types.TokenCloseParen:
-			panic("unexpected `)`")
+			p.error("unexpected `)`", token)
 		case types.TokenIntLit:
-			panic("unexpected int literal")
+			p.error("unexpected int literal", token)
 		case types.TokenEOF:
-			return program
+			return program, nil
 		default:
-			panic("unexpected token")
+			p.error("unexpected token", token)
 		}
 	}
 }
 
-func (p *Parser) parseExit() *types.NodeExit {
+func (p *Parser) parseExit() (*types.NodeExit, error) {
 	p.expect(types.TokenOpenParen)
-	expr := p.parseExpression()
+	expr, err := p.parseExpression()
+	if err != nil {
+		return &types.NodeExit{}, err
+	}
 	p.expect(types.TokenCloseParen)
 
-	return &types.NodeExit{Expr: expr}
+	return &types.NodeExit{Expr: expr, Pos: expr.Pos}, nil
 }
 
-func (p *Parser) parseExpression() types.NodeExpression {
-	term := p.parseTerm()
+func (p *Parser) parseExpression() (types.NodeExpression, error) {
+	term, err := p.parseTerm()
+	if err != nil {
+		return types.NodeExpression{}, err
+	}
 
 	switch p.peek(0).Type {
 	case types.TokenPlus:
 		p.consume()
-		right := p.parseExpression()
+		right, err := p.parseExpression()
+		if err != nil {
+			return types.NodeExpression{}, err
+		}
 		return types.NodeExpression{
 			BinExpr: &types.NodeBinExpr{
 				Left:  term,
 				Op:    types.BinOpAdd,
 				Right: right,
+				Pos:   term.Pos,
 			},
-		}
+		}, nil
 	case types.TokenMinus:
 		p.consume()
-		right := p.parseExpression()
+		right, err := p.parseExpression()
+		if err != nil {
+			return types.NodeExpression{}, err
+		}
 		return types.NodeExpression{
 			BinExpr: &types.NodeBinExpr{
 				Left:  term,
 				Op:    types.BinOpSub,
 				Right: right,
+				Pos:   term.Pos,
 			},
-		}
+		}, nil
 	}
 
-	return term
+	return term, nil
 }
 
-func (p *Parser) parseTerm() types.NodeExpression {
-	factor := p.parseFactor()
+func (p *Parser) parseTerm() (types.NodeExpression, error) {
+	factor, err := p.parseFactor()
+	if err != nil {
+		return types.NodeExpression{}, err
+	}
 
 	switch p.peek(0).Type {
 	case types.TokenStar:
 		p.consume()
-		right := p.parseTerm()
+		right, err := p.parseTerm()
+		if err != nil {
+			return types.NodeExpression{}, err
+		}
 		return types.NodeExpression{
 			BinExpr: &types.NodeBinExpr{
 				Left:  factor,
 				Op:    types.BinOpMul,
 				Right: right,
+				Pos:   factor.Pos,
 			},
-		}
+		}, nil
 	case types.TokenFSlash:
 		p.consume()
-		right := p.parseTerm()
+		right, err := p.parseTerm()
+		if err != nil {
+			return types.NodeExpression{}, err
+		}
 		return types.NodeExpression{
 			BinExpr: &types.NodeBinExpr{
 				Left:  factor,
 				Op:    types.BinOpDiv,
 				Right: right,
+				Pos:   factor.Pos,
 			},
-		}
+		}, nil
 	}
-	return factor
+	return factor, nil
 }
 
-func (p *Parser) parseFactor() types.NodeExpression {
+func (p *Parser) parseFactor() (types.NodeExpression, error) {
 	token := p.peek(0)
 
 	if token.Type == types.TokenOpenParen {
 		p.consume()
-		expr := p.parseExpression()
+		expr, err := p.parseExpression()
+		if err != nil {
+			return types.NodeExpression{}, err
+		}
 		p.expect(types.TokenCloseParen)
-		return expr
+		return expr, nil
 	}
 
-	token = p.expect(types.TokenIntLit)
+	if token.Type == types.TokenIdent {
+		p.consume()
+		return types.NodeExpression{Ident: token.Value, Pos: token.Pos}, nil
+	}
+
+	token, err := p.expect(types.TokenIntLit)
+	if err != nil {
+		return types.NodeExpression{}, err
+	}
 	i, err := strconv.Atoi(*token.Value)
 	if err != nil {
-		p.panic("invalid int literal", token)
+		p.error("invalid int literal", token)
 	}
-	return types.NodeExpression{IntLit: &i}
+	return types.NodeExpression{IntLit: &i, Pos: token.Pos}, nil
 }
 
-func (p *Parser) panic(err string, token types.Token) {
-	panic(fmt.Sprintf("%s:%d:%d: %s", p.filename, token.Pos.Line, token.Pos.Column, err))
+func (p *Parser) error(msg string, token types.Token) *types.CompileError {
+	return &types.CompileError{
+		File: p.filename,
+		Pos:  token.Pos,
+		Msg:  msg,
+	}
 }
 
-func (p *Parser) expect(tokenType types.TokenType) types.Token {
+func (p *Parser) expect(tokenType types.TokenType) (types.Token, error) {
 	token := p.consume()
 	if token.Type != tokenType {
-		p.panic(fmt.Sprintf("expected `%s` but got `%s`", tokenType, token.Type), token)
+		return token, p.error(fmt.Sprintf("expected `%s` but got `%s`", tokenType, token.Type), token)
 	}
-	return token
+	return token, nil
+}
+
+func (p *Parser) parseVarDecl(isConst bool) (*types.NodeVarDecl, error) {
+	name, err := p.expect(types.TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+
+	var typeName *string
+	if p.peek(0).Type == types.TokenColon {
+		p.consume()
+		typeToken, err := p.expect(types.TokenIdent)
+		if err != nil {
+			return nil, err
+		}
+		typeName = typeToken.Value
+	}
+
+	p.expect(types.TokenEquals)
+	expr, err := p.parseExpression()
+	if err != nil {
+		return &types.NodeVarDecl{}, err
+	}
+
+	return &types.NodeVarDecl{
+		Name:  *name.Value,
+		Type:  typeName,
+		Expr:  expr,
+		Const: isConst,
+		Pos:   expr.Pos,
+	}, nil
+}
+
+func (p *Parser) parseVarAssign() (*types.NodeVarAssign, error) {
+	name, err := p.expect(types.TokenIdent)
+	if err != nil {
+		return &types.NodeVarAssign{}, err
+	}
+	p.expect(types.TokenEquals)
+	expr, err := p.parseExpression()
+	if err != nil {
+		return &types.NodeVarAssign{}, err
+	}
+
+	return &types.NodeVarAssign{
+		Name: *name.Value,
+		Expr: expr,
+		Pos:  expr.Pos,
+	}, nil
 }
