@@ -85,13 +85,14 @@ jobs:
         with:
           msystem: CLANG64
           install: >
+            git
             mingw-w64-x86_64-llvm
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-clang
             mingw-w64-x86_64-lld
 
-      - name: Build llc statically
+      - name: Build llc and lld statically
         shell: msys2 {0}
         run: |
           git clone --depth 1 https://github.com/llvm/llvm-project.git
@@ -113,10 +114,6 @@ jobs:
           cp build/bin/lld-link.exe ../src/tools/bin/windows_amd64/lld-link.exe
           chmod +x ../src/tools/bin/windows_amd64/llc.exe
           chmod +x ../src/tools/bin/windows_amd64/lld-link.exe
-
-      - name: Copy lld
-        shell: msys2 {0}
-        run: |
 
       - name: Write versions
         shell: msys2 {0}
