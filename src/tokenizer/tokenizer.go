@@ -13,6 +13,15 @@ type Tokenizer struct {
 	column  int
 }
 
+var singleCharTokens = map[rune]types.TokenType{
+	'(': types.TokenOpenParen,
+	')': types.TokenCloseParen,
+	'+': types.TokenPlus,
+	'-': types.TokenMinus,
+	'*': types.TokenStar,
+	'/': types.TokenFSlash,
+}
+
 func NewTokenizer(content string) *Tokenizer {
 	t := Tokenizer{
 		content: content,
@@ -34,63 +43,43 @@ func (t *Tokenizer) Tokenize(output chan types.Token) {
 			break
 		}
 
-		switch types.TokenType(r) {
-		case types.TokenOpenParen:
+		// Single character tokens
+		if tokenType, ok := singleCharTokens[r]; ok {
 			t.consume()
-			output <- types.Token{Type: types.TokenOpenParen, Pos: t.pos()}
+			output <- types.Token{Type: tokenType, Pos: t.pos()}
 			continue
-		case types.TokenCloseParen:
+		}
+
+		// Whitespace
+		if unicode.IsSpace(r) {
 			t.consume()
-			output <- types.Token{Type: types.TokenCloseParen, Pos: t.pos()}
 			continue
-		case types.TokenPlus:
-			t.consume()
-			output <- types.Token{Type: types.TokenPlus, Pos: t.pos()}
-			continue
-		case types.TokenStar:
-			t.consume()
-			output <- types.Token{Type: types.TokenStar, Pos: t.pos()}
-			continue
-		default:
-			// Check if it's whitespace
-			if unicode.IsSpace(r) {
-				t.consume()
-				continue
+		}
+
+		// Multi-character tokens
+		var buffer []rune
+		isNumber := unicode.IsDigit(r)
+
+		for {
+			r := t.peek(0)
+			if r == 0 || !(unicode.IsLetter(r) || unicode.IsDigit(r)) {
+				break
 			}
-
-			// Otherwise, read it into a buffer until we hit whitespace
-			var buffer []rune
-			isNumber := unicode.IsDigit(r)
-
-			for {
-				r := t.peek(0)
-				if r == 0 {
-					break
-				}
-				if !(unicode.IsLetter(r) || unicode.IsDigit(r)) {
-					break
-				}
-
-				buffer = append(buffer, t.consume())
-
-				if len(buffer) > 4096 {
-					panic("token too long")
-				}
+			buffer = append(buffer, t.consume())
+			if len(buffer) > 4096 {
+				panic("token too long")
 			}
+		}
 
-			// Now check what we read
-			if isNumber {
-				// We have a number
-				str := string(buffer)
-				output <- types.Token{Type: types.TokenIntLit, Value: &str, Pos: t.pos()}
-			} else {
-				// Check if it's a keyword
-				switch string(buffer) {
-				case "exit":
-					output <- types.Token{Type: types.TokenExit, Pos: t.pos()}
-				default: // Identifier
-					panic("Not implemented: identifiers")
-				}
+		if isNumber {
+			str := string(buffer)
+			output <- types.Token{Type: types.TokenIntLit, Value: &str, Pos: t.pos()}
+		} else {
+			switch string(buffer) {
+			case "exit":
+				output <- types.Token{Type: types.TokenExit, Pos: t.pos()}
+			default:
+				panic("not implemented: identifiers")
 			}
 		}
 	}

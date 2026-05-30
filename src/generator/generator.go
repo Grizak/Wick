@@ -70,7 +70,17 @@ func (g *Generator) Generate(fileName, target string) string {
 
 func (g *Generator) generateExit(exit *types.NodeExit) {
 	expr := g.generateExpression(exit.Expr)
-	g.writeLine(fmt.Sprintf(`  call void @exit(i32 %s)`, expr))
+
+	// If it's a constant, no truncation needed
+	if _, err := strconv.Atoi(expr); err == nil {
+		g.writeLine(fmt.Sprintf("  call void @exit(i32 %s)", expr))
+		return
+	}
+
+	// Otherwise truncate from i64 to i32
+	truncated := g.tmpVar()
+	g.writeLine(fmt.Sprintf("  %s = trunc i64 %s to i32", truncated, expr))
+	g.writeLine(fmt.Sprintf("  call void @exit(i32 %s)", truncated))
 }
 
 func (g *Generator) writeLine(line string) {
@@ -90,27 +100,28 @@ func (g *Generator) generateExpression(expr types.NodeExpression) string {
 	}
 
 	if expr.BinExpr != nil {
-		// Constant folding - if both sides are static, evaluate at compile time
 		if isStatic(expr.BinExpr.Left) && isStatic(expr.BinExpr.Right) {
 			return strconv.Itoa(foldBinExpr(expr.BinExpr))
 		}
 
-		// Generate LLVM IR for runtime arithmetic
 		left := g.generateExpression(expr.BinExpr.Left)
 		right := g.generateExpression(expr.BinExpr.Right)
-
 		result := g.tmpVar()
 
-		reg := g.getRegister()
 		switch expr.BinExpr.Op {
 		case types.BinOpAdd:
-			g.writeLine(fmt.Sprintf("  %s = add i32 %s, %s", result, left, right))
+			g.writeLine(fmt.Sprintf("  %s = add i64 %s, %s", result, left, right))
+		case types.BinOpSub:
+			g.writeLine(fmt.Sprintf("  %s = sub i64 %s, %s", result, left, right))
 		case types.BinOpMul:
-			g.writeLine(fmt.Sprintf("    %s = mul i64 %s, %s", result, left, right))
+			g.writeLine(fmt.Sprintf("  %s = mul i64 %s, %s", result, left, right))
+		case types.BinOpDiv:
+			g.writeLine(fmt.Sprintf("  %s = sdiv i64 %s, %s", result, left, right))
 		default:
 			panic(fmt.Sprintf("unknown operator: %s", expr.BinExpr.Op))
 		}
-		return reg[1:] // Remove the % prefix since it's already in the register
+
+		return result
 	}
 
 	panic("unknown expression type")
@@ -133,8 +144,15 @@ func foldBinExpr(expr *types.NodeBinExpr) int {
 	switch expr.Op {
 	case types.BinOpAdd:
 		return left + right
+	case types.BinOpSub:
+		return left - right
 	case types.BinOpMul:
 		return left * right
+	case types.BinOpDiv:
+		if right == 0 {
+			panic("division by zero")
+		}
+		return left / right
 	default:
 		panic(fmt.Sprintf("unknown operator: %s", expr.Op))
 	}
