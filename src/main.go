@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/Grizak/Wick/src/backend"
@@ -22,7 +23,7 @@ type Args struct {
 	Input              []string `arg:"positional,required" help:"Input file(s)"`
 	Output             string   `arg:"-o,--output" help:"Output file"`
 	SaveIntermediaries bool     `arg:"-s,--save-intermediaries" help:"Save intermediary files"`
-	Target             string   `arg:"-t,--target" env:"WICK_TARGET" default:"linux/amd64" help:"Compilation target (default: linux/amd64)"`
+	Target             string   `arg:"-t,--target" env:"WICK_TARGET" help:"Compilation target (default: GOOS/GOARCH, can also be set via WICK_TARGET environment variable)"`
 }
 
 func (Args) Version() string {
@@ -35,6 +36,10 @@ var args Args
 // generate llvm ir and write it to a file, pass it to llc and lld
 func main() {
 	arg.MustParse(&args)
+
+	if args.Target == "" {
+		args.Target = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	}
 
 	// Make sure that the input files exists
 	for i := range args.Input {
