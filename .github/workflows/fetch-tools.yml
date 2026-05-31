@@ -92,18 +92,36 @@ jobs:
             python3
             mingw-w64-x86_64-llvm
 
-      - name: Cache build directory
+      - name: Get LLVM version
+        id: llvm-version
+        shell: msys2 {0}
+        run: |
+          LLVM_VERSION=$(llvm-config --version)
+          echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Cache LLVM source
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: llvm-project
+          key: llvm-source-${{ steps.llvm-version.outputs.version }}
+
+      - name: Clone LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          git clone --depth 1 https://github.com/llvm/llvm-project.git
+
+      - name: Cache LLVM build
+        id: cache-llvm-build
         uses: actions/cache@v4
         with:
           path: llvm-project/build
-          key: llvm-build-${{ runner.os }}-${{ hashFiles('**/CMakeLists.txt') }}
-          restore-keys: |
-            llvm-build-${{ runner.os }}-
+          key: llvm-build-${{ steps.llvm-version.outputs.version }}
 
       - name: Build llc and lld statically
         shell: msys2 {0}
         run: |
-          git clone --depth 1 https://github.com/llvm/llvm-project.git
           cd llvm-project
           cmake -S llvm -B build \
             -G Ninja \
