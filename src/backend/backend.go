@@ -33,7 +33,12 @@ func Link(objFiles []string, outFile string, save bool, target string) error {
 
 	var args []string
 	if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
-		args = append(args, "/subsystem:console", "kernel32.lib", "/out:"+outFile)
+		args = append(args,
+			"/subsystem:console",
+			"/out:"+outFile,
+			"/libpath:"+tools.LldCacheDir(),
+			"kernel32.lib",
+		)
 	} else {
 		args = append(args, "-o", outFile)
 	}
