@@ -90,7 +90,7 @@ jobs:
             ninja
             clang
             python3
-            mingw-w64-x86_64-llvm
+            llvm
 
       - name: Get LLVM version
         id: llvm-version
