@@ -21,7 +21,11 @@ func Assemble(asmFile, objFile, outFile string, save bool, idx int) error {
 			return err
 		}
 	} else {
+		err := tools.ExecuteCommand(llcPath, "-filetype=asm", asmFile, "-o", objFile[:len(objFile)-11]+fmt.Sprint(idx)+".asm")
 		if err := os.Rename(asmFile, outFile+fmt.Sprint(idx)+".ll"); err != nil {
+			return err
+		}
+		if err != nil {
 			return err
 		}
 	}
