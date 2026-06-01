@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/Grizak/Wick/src/backend"
@@ -22,7 +23,7 @@ type Args struct {
 	Input              []string `arg:"positional,required" help:"Input file(s)"`
 	Output             string   `arg:"-o,--output" help:"Output file"`
 	SaveIntermediaries bool     `arg:"-s,--save-intermediaries" help:"Save intermediary files"`
-	Target             string   `arg:"-t,--target" env:"WICK_TARGET" default:"linux/amd64" help:"Compilation target (default: linux/amd64)"`
+	Target             string   `arg:"-t,--target" env:"WICK_TARGET" help:"Compilation target (default: GOOS/GOARCH, can also be set via WICK_TARGET environment variable)"`
 }
 
 func (Args) Version() string {
@@ -35,6 +36,16 @@ var args Args
 // generate llvm ir and write it to a file, pass it to llc and lld
 func main() {
 	arg.MustParse(&args)
+
+	if args.Target == "" {
+		args.Target = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	err := validateTarget(runtime.GOOS, args.Target)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	// Make sure that the input files exists
 	for i := range args.Input {
@@ -131,4 +142,13 @@ func main() {
 	}
 
 	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries, types.TargetTriples[args.Target])
+}
+
+func validateTarget(host, target string) error {
+	// Windows can only be targeted from Windows
+	if (target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc") &&
+		runtime.GOOS != "windows" {
+		return fmt.Errorf("cross-compiling to Windows is not currently supported")
+	}
+	return nil
 }
