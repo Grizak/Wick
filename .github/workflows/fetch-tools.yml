@@ -144,14 +144,12 @@ jobs:
           chmod +x ../src/tools/bin/windows_amd64/llc.exe
           chmod +x ../src/tools/bin/windows_amd64/lld-link.exe
 
-      - name: Copy kernel32.lib to all platforms
+      - name: Copy kernel32.lib
         shell: pwsh
         run: |
           $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" | Sort-Object Name -Descending | Select-Object -First 1
           $lib = "$($sdk.FullName)\um\x64\kernel32.lib"
           cp $lib src/tools/bin/windows_amd64/kernel32.lib
-          cp $lib src/tools/bin/linux_amd64/kernel32.lib
-          cp $lib src/tools/bin/darwin_arm64/kernel32.lib
 
       - name: Write versions
         shell: msys2 {0}
