@@ -3,6 +3,7 @@ package backend
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/Grizak/Wick/src/tools"
 )
@@ -32,13 +33,13 @@ func Link(objFiles []string, outFile string, save bool, target string) error {
 	lldPath := tools.LldPath()
 
 	var args []string
-	if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
+	if runtime.GOOS == "windows" {
 		args = append(args,
-			"/subsystem:console",
 			"/out:"+outFile,
-			"/libpath:"+tools.LldCacheDir(),
-			"kernel32.lib",
 		)
+		if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
+			args = append(args, "/subsystem:console", "/libpath:"+tools.LldCacheDir()+"kernel32.lib")
+		}
 	} else {
 		args = append(args, "-o", outFile)
 	}

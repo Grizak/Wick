@@ -41,6 +41,12 @@ func main() {
 		args.Target = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
+	err := validateTarget(runtime.GOOS, args.Target)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	// Make sure that the input files exists
 	for i := range args.Input {
 		input := args.Input[i]
@@ -136,4 +142,13 @@ func main() {
 	}
 
 	backend.Link(generatedFiles, args.Output, args.SaveIntermediaries, types.TargetTriples[args.Target])
+}
+
+func validateTarget(host, target string) error {
+	// Windows can only be targeted from Windows
+	if (target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc") &&
+		runtime.GOOS != "windows" {
+		return fmt.Errorf("cross-compiling to Windows is not currently supported")
+	}
+	return nil
 }

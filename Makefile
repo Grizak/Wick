@@ -1,6 +1,6 @@
 GO = go
 BUILD_DIR = build
-TARGET ?= wickc
+TARGET ?= wick
 TARGET_FULL = $(BUILD_DIR)/$(TARGET)
 SOURCES = src/main.go
 
