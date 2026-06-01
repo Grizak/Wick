@@ -34,8 +34,9 @@ func Init() error {
 		name string
 		data []byte
 	}{
-		{llcCacheDir(), llcBinaryName(), llcBinary},
-		{lldCacheDir(), lldBinaryName(), lldBinary},
+		{LlcCacheDir(), LlcBinaryName(), llcBinary},
+		{LldCacheDir(), LldBinaryName(), lldBinary},
+		{LldCacheDir(), "kernel32.lib", kernel32Lib},
 	} {
 		path := filepath.Join(b.dir, b.name)
 		if _, err := os.Stat(path); err == nil {
@@ -51,23 +52,23 @@ func Init() error {
 	return nil
 }
 
-func lldCacheDir() string {
+func LldCacheDir() string {
 	return filepath.Join(tmpDir, "lld-"+versions["lld"])
 }
 
-func llcCacheDir() string {
+func LlcCacheDir() string {
 	return filepath.Join(tmpDir, "llc-"+versions["llc"])
 }
 
 func LldPath() string {
-	return filepath.Join(lldCacheDir(), lldBinaryName())
+	return filepath.Join(LldCacheDir(), LldBinaryName())
 }
 
 func LlcPath() string {
-	return filepath.Join(llcCacheDir(), llcBinaryName())
+	return filepath.Join(LlcCacheDir(), LlcBinaryName())
 }
 
-func lldBinaryName() string {
+func LldBinaryName() string {
 	switch runtime.GOOS {
 	case "windows":
 		return "lld-link.exe"
@@ -78,7 +79,7 @@ func lldBinaryName() string {
 	}
 }
 
-func llcBinaryName() string {
+func LlcBinaryName() string {
 	if runtime.GOOS == "windows" {
 		return "llc.exe"
 	}
