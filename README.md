@@ -23,7 +23,7 @@ wickc input.wi -o output
 # Cross-compile to a specific target
 wickc input.wi -o output -t linux/amd64
 
-# Save intermediary files (.ll and .o)
+# Save intermediary files (.ll, .asm and .o)
 wickc input.wi -o output -s
 ```
 
