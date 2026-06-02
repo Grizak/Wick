@@ -5,12 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/Grizak/Wick/src/backend"
 	"github.com/Grizak/Wick/src/generator"
+	"github.com/Grizak/Wick/src/lexer"
 	"github.com/Grizak/Wick/src/parser"
-	"github.com/Grizak/Wick/src/tokenizer"
 	"github.com/Grizak/Wick/src/tools"
 	"github.com/Grizak/Wick/src/types"
 	"github.com/alexflint/go-arg"
@@ -21,9 +22,10 @@ var version string // Filled in by ldflags at build time
 
 type Args struct {
 	Input              []string `arg:"positional,required" help:"Input file(s)"`
-	Output             string   `arg:"-o,--output" help:"Output file"`
+	Output             string   `arg:"-o,--output" default:"dist/out" help:"Output file"`
 	SaveIntermediaries bool     `arg:"-s,--save-intermediaries" help:"Save intermediary files"`
-	Target             string   `arg:"-t,--target" env:"WICK_TARGET" help:"Compilation target (default: GOOS/GOARCH, can also be set via WICK_TARGET environment variable)"`
+	Target             string   `arg:"-t,--target" help:"Compilation target (default: GOOS/GOARCH, can also be set via WICK_TARGET environment variable)"`
+	KeepOutput         bool     `arg:"-k,--keep-output" help:"Don't clear output directory when building"`
 }
 
 func (Args) Version() string {
@@ -32,10 +34,36 @@ func (Args) Version() string {
 
 var args Args
 
+var outDir string
+
 // Parse args to get input file, then read input file, tokenize it, parse it,
 // generate llvm ir and write it to a file, pass it to llc and lld
 func main() {
 	arg.MustParse(&args)
+
+	// Get path from Output and make sure that the parent directory exists
+	outDir = filepath.Dir(args.Output)
+	if _, err := os.Stat(outDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			fatal("Failed to create output directory %s: %v", outDir, err)
+		}
+	} else if !args.KeepOutput {
+		// Clear output directory
+		files, err := os.ReadDir(outDir)
+		if err != nil {
+			fatal("Failed to read output directory %s: %v", outDir, err)
+		}
+		for _, file := range files {
+			if err := os.RemoveAll(filepath.Join(outDir, file.Name())); err != nil {
+				fatal("Failed to clear output directory %s: %v", outDir, err)
+			}
+		}
+	}
+
+	// Determine target triple
+	if args.Target == "" {
+		args.Target = os.Getenv("WICK_TARGET")
+	}
 
 	if args.Target == "" {
 		args.Target = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
@@ -43,7 +71,7 @@ func main() {
 
 	err := validateTarget(runtime.GOOS, args.Target)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fatal("%s", err)
 		os.Exit(1)
 	}
 
@@ -51,7 +79,7 @@ func main() {
 	for i := range args.Input {
 		input := args.Input[i]
 		if _, err := os.Stat(input); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "%s: %s, %s\n", "Failed to read input file", input, "file doesn't exist")
+			fatal("%s: %s, %s", "Failed to read input file", input, "file doesn't exist")
 			os.Exit(1)
 		}
 	}
@@ -80,9 +108,9 @@ func main() {
 				return
 			}
 
-			tokenizer := tokenizer.NewTokenizer(string(content))
-			output := make(chan types.Token, 4096)
-			go tokenizer.Tokenize(output)
+			lexer := lexer.NewLexer(string(content), input)
+			output := make(chan types.LexerResult, 4096)
+			go lexer.Tokenize(output)
 
 			parser := parser.NewParser(filepath.Base(input))
 			program, err := parser.Parse(output)
@@ -146,9 +174,14 @@ func main() {
 
 func validateTarget(host, target string) error {
 	// Windows can only be targeted from Windows
-	if (target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc") &&
-		runtime.GOOS != "windows" {
+	if strings.HasPrefix(target, "windows/") &&
+		host != "windows" {
 		return fmt.Errorf("cross-compiling to Windows is not currently supported")
 	}
 	return nil
+}
+
+func fatal(format string, a ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
+	os.Exit(1)
 }

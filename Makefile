@@ -11,7 +11,7 @@ all:
 	$(GO) build -ldflags "-X main.version=$(shell git describe --tags --abbrev=0)" -o $(TARGET_FULL) $(SOURCES)
 
 art:
-	rm *.ll *.o *.asm out 2>/dev/null
+	rm -rf dist 2>/dev/null
 
 clean: art
 	rm -rf $(BUILD_DIR) 2>/dev/null
