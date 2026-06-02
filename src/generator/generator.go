@@ -5,29 +5,32 @@ import (
 	"strconv"
 	"strings"
 
+	lang_types "github.com/Grizak/Wick/src/lang-types"
 	"github.com/Grizak/Wick/src/types"
 )
 
 type Symbol struct {
 	llvmName    string
 	isConst     bool
-	varType     string
-	staticValue *int
+	symbolType  lang_types.Type // The actual type of this symbol
+	staticValue any             // Can be *int or *float64
 }
 
 type Generator struct {
-	root     *types.NodeProgram
-	output   strings.Builder
-	tmpCount int
-	symbols  map[string]Symbol
-	fileName string
+	root        *types.NodeProgram
+	output      strings.Builder
+	tmpCount    int
+	symbols     map[string]Symbol
+	fileName    string
+	typeChecker *lang_types.TypeChecker
 }
 
 func NewGenerator(root *types.NodeProgram) *Generator {
 	g := Generator{
-		root:     root,
-		tmpCount: 0,
-		symbols:  make(map[string]Symbol),
+		root:        root,
+		tmpCount:    0,
+		symbols:     make(map[string]Symbol),
+		typeChecker: lang_types.NewTypeChecker(),
 	}
 
 	return &g
@@ -95,16 +98,29 @@ func (g *Generator) generateExit(exit *types.NodeExit) error {
 		return err
 	}
 
-	// If it's a constant, no truncation needed
+	// Infer the type of the exit expression
+	exprType, err := g.typeChecker.InferType(&exit.Expr)
+	if err != nil {
+		return g.error(fmt.Sprintf("cannot infer exit expression type: %v", err), exit.Pos)
+	}
+
+	// If it's a constant int, we can use it directly
 	if _, err := strconv.Atoi(expr); err == nil {
+		// It's a numeric constant, use as-is but ensure it's in int32 range
 		g.writeLine(fmt.Sprintf("    call void @exit(i32 %s)", expr))
 		return nil
 	}
 
-	// Otherwise truncate from i64 to i32
-	truncated := g.tmpVar()
-	g.writeLine(fmt.Sprintf("    %s = trunc i64 %s to i32", truncated, expr))
-	g.writeLine(fmt.Sprintf("    call void @exit(i32 %s)", truncated))
+	// Otherwise, convert to i32
+	converted := g.tmpVar()
+	if isFloatType(exprType) {
+		// Convert double to i32
+		g.writeLine(fmt.Sprintf("    %s = fptosi double %s to i32", converted, expr))
+	} else {
+		// Truncate i64 to i32
+		g.writeLine(fmt.Sprintf("    %s = trunc i64 %s to i32", converted, expr))
+	}
+	g.writeLine(fmt.Sprintf("    call void @exit(i32 %s)", converted))
 	return nil
 }
 
@@ -118,12 +134,44 @@ func (g *Generator) generateExpression(expr types.NodeExpression) (string, error
 		return strconv.Itoa(*expr.IntLit), nil
 	}
 
+	if expr.FloatLit != nil {
+		// Return the float literal as a double constant
+		floatStr := strconv.FormatFloat(*expr.FloatLit, 'f', -1, 64)
+		return floatStr, nil
+	}
+
+	if expr.BoolLit != nil {
+		// Convert bool to i1 (0 or 1)
+		val := 0
+		if *expr.BoolLit {
+			val = 1
+		}
+		return strconv.Itoa(val), nil
+	}
+
+	if expr.StringLit != nil {
+		// For now, strings not fully supported in code generation
+		return "", g.error("string literals not yet supported in code generation", expr.Pos)
+	}
+
+	// Try to constant-fold the expression at compile time
+	if staticVal := g.computeStaticValue(expr); staticVal != nil {
+		return strconv.Itoa(*staticVal), nil
+	}
+
 	if expr.BinExpr != nil {
-		if g.isStatic(expr.BinExpr.Left) && g.isStatic(expr.BinExpr.Right) {
-			folded, err := g.foldBinExpr(expr.BinExpr)
-			return strconv.Itoa(folded), err
+		// Determine the types of left and right operands
+		leftType, err := g.typeChecker.InferType(&expr.BinExpr.Left)
+		if err != nil {
+			return "", g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
 		}
 
+		rightType, err := g.typeChecker.InferType(&expr.BinExpr.Right)
+		if err != nil {
+			return "", g.error(fmt.Sprintf("cannot infer right operand type: %v", err), expr.BinExpr.Pos)
+		}
+
+		// Generate code for operands
 		left, err := g.generateExpression(expr.BinExpr.Left)
 		if err != nil {
 			return "", err
@@ -132,17 +180,51 @@ func (g *Generator) generateExpression(expr types.NodeExpression) (string, error
 		if err != nil {
 			return "", err
 		}
+
+		// Determine if we're doing float or int operations
+		isFloat := isFloatType(leftType) || isFloatType(rightType)
+
+		// Promote int to float if needed
+		if isFloat {
+			if !isFloatType(leftType) {
+				promoted := g.tmpVar()
+				g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", promoted, left))
+				left = promoted
+			}
+			if !isFloatType(rightType) {
+				promoted := g.tmpVar()
+				g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", promoted, right))
+				right = promoted
+			}
+		}
+
 		result := g.tmpVar()
 
 		switch expr.BinExpr.Op {
 		case types.BinOpAdd:
-			g.writeLine(fmt.Sprintf("    %s = add i64 %s, %s", result, left, right))
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fadd double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = add i64 %s, %s", result, left, right))
+			}
 		case types.BinOpSub:
-			g.writeLine(fmt.Sprintf("    %s = sub i64 %s, %s", result, left, right))
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fsub double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = sub i64 %s, %s", result, left, right))
+			}
 		case types.BinOpMul:
-			g.writeLine(fmt.Sprintf("    %s = mul i64 %s, %s", result, left, right))
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fmul double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = mul i64 %s, %s", result, left, right))
+			}
 		case types.BinOpDiv:
-			g.writeLine(fmt.Sprintf("    %s = sdiv i64 %s, %s", result, left, right))
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fdiv double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = sdiv i64 %s, %s", result, left, right))
+			}
 		default:
 			return "", g.error(fmt.Sprintf("unknown operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
 		}
@@ -161,8 +243,13 @@ func (g *Generator) generateExpression(expr types.NodeExpression) (string, error
 		}
 		// Mutable variables need a load
 		result := g.tmpVar()
-		g.writeLine(fmt.Sprintf("    %s = load i64, ptr %s", result, sym.llvmName))
+		llvmType := sym.symbolType.LLVMType()
+		g.writeLine(fmt.Sprintf("    %s = load %s, ptr %s", result, llvmType, sym.llvmName))
 		return result, nil
+	}
+
+	if expr.FuncCall != nil {
+		return "", g.error("function calls not yet supported in code generation", expr.Pos)
 	}
 
 	return "", g.error("unknown expression type", expr.Pos)
@@ -204,11 +291,7 @@ func (g *Generator) foldBinExpr(expr *types.NodeBinExpr) (int, error) {
 		return left * right, nil
 	case types.BinOpDiv:
 		if right == 0 {
-			return 0, &types.CompileError{
-				File: g.fileName,
-				Pos:  expr.Pos,
-				Msg:  "Divide by zero",
-			}
+			return 0, g.error("division by zero in constant expression", expr.Pos)
 		}
 		return left / right, nil
 	default:
@@ -228,7 +311,12 @@ func (g *Generator) foldExpression(expr types.NodeExpression) (int, error) {
 		if sym.staticValue == nil {
 			return 0, g.error(fmt.Sprintf("variable is not statically known: %s", *expr.Ident), expr.Pos)
 		}
-		return *sym.staticValue, nil
+		// Type assert the staticValue to *int
+		intVal, ok := sym.staticValue.(*int)
+		if !ok {
+			return 0, g.error(fmt.Sprintf("variable is not an integer constant: %s", *expr.Ident), expr.Pos)
+		}
+		return *intVal, nil
 	}
 	if expr.BinExpr != nil {
 		return g.foldBinExpr(expr.BinExpr)
@@ -275,24 +363,49 @@ func (g *Generator) generateVarDecl(decl *types.NodeVarDecl) error {
 		return g.error(fmt.Sprintf("variable already declared: %s", decl.Name), decl.Pos)
 	}
 
+	// Infer or get the variable type
+	var varType lang_types.Type
+	if decl.Type != nil {
+		var err error
+		varType, err = g.typeChecker.ParseTypeString(*decl.Type)
+		if err != nil {
+			return g.error(fmt.Sprintf("invalid type: %v", err), decl.Pos)
+		}
+	} else {
+		// Infer type from expression
+		var err error
+		varType, err = g.typeChecker.InferType(&decl.Expr)
+		if err != nil {
+			return g.error(fmt.Sprintf("cannot infer type: %v", err), decl.Pos)
+		}
+	}
+
 	expr, err := g.generateExpression(decl.Expr)
 	if err != nil {
 		return err
 	}
 
 	sym := Symbol{
-		llvmName:    expr,
-		isConst:     decl.Const,
-		varType:     "i64",
-		staticValue: g.computeStaticValue(decl.Expr),
+		llvmName:   expr,
+		isConst:    decl.Const,
+		symbolType: varType,
+	}
+
+	// Try to compute and store the static value if this expression is constant
+	if staticVal := g.computeStaticValue(decl.Expr); staticVal != nil {
+		sym.staticValue = staticVal
 	}
 
 	if !decl.Const {
 		ptr := fmt.Sprintf("%%var_%s", decl.Name)
-		g.writeLine(fmt.Sprintf("    %s = alloca i64", ptr))
-		g.writeLine(fmt.Sprintf("    store i64 %s, ptr %s", expr, ptr))
+		llvmType := varType.LLVMType()
+		g.writeLine(fmt.Sprintf("    %s = alloca %s", ptr, llvmType))
+		g.writeLine(fmt.Sprintf("    store %s %s, ptr %s", llvmType, expr, ptr))
 		sym.llvmName = ptr
 	}
+
+	// Define the variable in the type checker environment for future type inference
+	g.typeChecker.Environment().Define(decl.Name, varType)
 
 	g.symbols[decl.Name] = sym
 	return nil
@@ -312,17 +425,15 @@ func (g *Generator) generateVarAssign(assign *types.NodeVarAssign) error {
 		return err
 	}
 
-	sym.staticValue = g.computeStaticValue(assign.Expr)
-	g.symbols[assign.Name] = sym
-
-	g.writeLine(fmt.Sprintf("  store i64 %s, ptr %s", expr, sym.llvmName))
+	llvmType := sym.symbolType.LLVMType()
+	g.writeLine(fmt.Sprintf("    store %s %s, ptr %s", llvmType, expr, sym.llvmName))
 	return nil
 }
 
 func (g *Generator) error(msg string, pos types.Position) *types.CompileError {
 	return &types.CompileError{
 		File: g.fileName,
-		Pos:  pos,
+		Pos:  &pos,
 		Msg:  msg,
 	}
 }
@@ -336,4 +447,10 @@ func (g *Generator) computeStaticValue(expr types.NodeExpression) *int {
 		return nil
 	}
 	return &v
+}
+
+// isFloatType checks if a type is a floating point type
+func isFloatType(t lang_types.Type) bool {
+	_, ok := t.(*lang_types.FloatType)
+	return ok
 }

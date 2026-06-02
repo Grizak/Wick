@@ -8,3 +8,8 @@ const (
 	BinOpMul BinOp = "*"
 	BinOpDiv BinOp = "/"
 )
+
+type LexerResult struct {
+	Token Token
+	Err   *CompileError
+}
