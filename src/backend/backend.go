@@ -12,22 +12,26 @@ func Assemble(asmFile, objFile, outFile string, save bool, idx int) error {
 	llcPath := tools.LlcPath()
 
 	err := tools.ExecuteCommand(llcPath, "-filetype=obj", asmFile, "-o", objFile)
-	if err != nil {
-		return err
-	}
 
-	if !save {
+	// If it failed, try to save the .ll file for debugging
+	if !save && err == nil {
 		if err := os.Remove(asmFile); err != nil {
 			return err
 		}
 	} else {
-		err := tools.ExecuteCommand(llcPath, "-filetype=asm", asmFile, "-o", objFile[:len(objFile)-11]+fmt.Sprint(idx)+".asm")
+		if err == nil {
+			err := tools.ExecuteCommand(llcPath, "-filetype=asm", asmFile, "-o", objFile[:len(objFile)-11]+fmt.Sprint(idx)+".asm")
+			if err != nil {
+				return err
+			}
+		}
 		if err := os.Rename(asmFile, outFile+fmt.Sprint(idx)+".ll"); err != nil {
 			return err
 		}
-		if err != nil {
-			return err
-		}
+	}
+
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -50,11 +54,8 @@ func Link(objFiles []string, outFile string, save bool, target string) error {
 	args = append(args, objFiles...)
 
 	err := tools.ExecuteCommand(lldPath, args...)
-	if err != nil {
-		return err
-	}
 
-	if !save {
+	if !save && err == nil {
 		for _, objFile := range objFiles {
 			if err := os.Remove(objFile); err != nil {
 				return err
@@ -66,6 +67,10 @@ func Link(objFiles []string, outFile string, save bool, target string) error {
 				return err
 			}
 		}
+	}
+
+	if err != nil {
+		return err
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package types
 
 type NodeProgram struct {
 	Statements []NodeStatement
+	Filename   string
 }
 
 type NodeStatement struct {
@@ -16,10 +17,20 @@ type NodeExit struct {
 }
 
 type NodeExpression struct {
-	BinExpr *NodeBinExpr
-	IntLit  *int
-	Ident   *string
-	Pos     Position
+	BinExpr   *NodeBinExpr
+	FuncCall  *NodeFuncCall
+	IntLit    *int
+	FloatLit  *float64
+	BoolLit   *bool
+	StringLit *string
+	Ident     *string
+	Pos       Position
+}
+
+type NodeFuncCall struct {
+	Name string
+	Args []NodeExpression
+	Pos  Position
 }
 
 type NodeBinExpr struct {
