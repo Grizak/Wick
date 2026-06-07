@@ -14,6 +14,8 @@ type NodeStatement struct {
 	Block     *NodeBlock
 	If        *NodeIf
 	For       *NodeFor
+	Break     *NodeBreak
+	Continue  *NodeContinue
 }
 
 type NodeExit struct {
@@ -77,4 +79,12 @@ type NodeFor struct {
 	Post      *NodeStatement  // nil for while-style and infinite
 	Body      NodeBlock
 	Pos       types.Position
+}
+
+type NodeBreak struct {
+	Pos types.Position
+}
+
+type NodeContinue struct {
+	Pos types.Position
 }
