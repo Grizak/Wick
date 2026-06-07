@@ -41,7 +41,11 @@ func (g *Generator) Generate(fileName, target string) (string, error) {
 	g.fileName = fileName
 	// Write some metadata about the file (based on target)
 	g.writeLine(fmt.Sprintf(`target triple = "%s"`, target))
-	g.writeLine(`target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"`)
+  datalayout, err := getDatalayout(target)
+  if err != nil {
+    return "", err
+  }
+	g.writeLine(fmt.Sprintf(`target datalayout = "%s"`, datalayout))
 
 	g.writeLine(fmt.Sprintf(`source_filename = "%s"`, fileName))
 
@@ -364,26 +368,39 @@ func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
 		return g.error(fmt.Sprintf("variable already declared: %s", decl.Name), decl.Pos)
 	}
 
-	// Infer or get the variable type
+	// Always infer the expression type first
+	exprType, err := g.typeChecker.InferType(&decl.Expr)
+	if err != nil {
+		return g.error(fmt.Sprintf("cannot infer type: %v", err), decl.Pos)
+	}
+
 	var varType typesys.Type
 	if decl.Type != nil {
-		var err error
 		varType, err = g.typeChecker.ParseTypeString(*decl.Type)
 		if err != nil {
 			return g.error(fmt.Sprintf("invalid type: %v", err), decl.Pos)
 		}
-	} else {
-		// Infer type from expression
-		var err error
-		varType, err = g.typeChecker.InferType(&decl.Expr)
-		if err != nil {
-			return g.error(fmt.Sprintf("cannot infer type: %v", err), decl.Pos)
+		// Validate expression type against declared type
+		if !exprType.Equals(varType) && !typesys.TryCoerce(exprType, varType) {
+			return g.error(fmt.Sprintf(
+				"type mismatch for '%s': declared %s but expression is %s",
+				decl.Name, varType.Name(), exprType.Name(),
+			), decl.Pos)
 		}
+	} else {
+		varType = exprType
 	}
 
 	expr, err := g.generateExpression(decl.Expr)
 	if err != nil {
 		return err
+	}
+
+	// Emit int → float coercion if needed
+	if isFloatType(varType) && !isFloatType(exprType) {
+		converted := g.tmpVar()
+		g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", converted, expr))
+		expr = converted
 	}
 
 	sym := Symbol{
@@ -392,7 +409,6 @@ func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
 		symbolType: varType,
 	}
 
-	// Try to compute and store the static value if this expression is constant
 	if staticVal := g.computeStaticValue(decl.Expr); staticVal != nil {
 		sym.staticValue = staticVal
 	}
@@ -405,9 +421,7 @@ func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
 		sym.llvmName = ptr
 	}
 
-	// Define the variable in the type checker environment for future type inference
 	g.typeChecker.Environment().Define(decl.Name, varType)
-
 	g.symbols[decl.Name] = sym
 	return nil
 }
@@ -421,10 +435,33 @@ func (g *Generator) generateVarAssign(assign *ast.NodeVarAssign) error {
 		return g.error(fmt.Sprintf("cannot reassign const variable: %s", assign.Name), assign.Pos)
 	}
 
+	// Type-check the assignment
+	exprType, err := g.typeChecker.InferType(&assign.Expr)
+	if err != nil {
+		return g.error(fmt.Sprintf("cannot infer type: %v", err), assign.Pos)
+	}
+	if !exprType.Equals(sym.symbolType) && !typesys.TryCoerce(exprType, sym.symbolType) {
+		return g.error(fmt.Sprintf(
+			"type mismatch in assignment to '%s': expected %s but got %s",
+			assign.Name, sym.symbolType.Name(), exprType.Name(),
+		), assign.Pos)
+	}
+
 	expr, err := g.generateExpression(assign.Expr)
 	if err != nil {
 		return err
 	}
+
+	// Emit int → float coercion if needed
+	if isFloatType(sym.symbolType) && !isFloatType(exprType) {
+		converted := g.tmpVar()
+		g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", converted, expr))
+		expr = converted
+	}
+
+	// Update static value tracking
+	sym.staticValue = g.computeStaticValue(assign.Expr)
+	g.symbols[assign.Name] = sym
 
 	llvmType := sym.symbolType.LLVMType()
 	g.writeLine(fmt.Sprintf("    store %s %s, ptr %s", llvmType, expr, sym.llvmName))
@@ -454,4 +491,70 @@ func (g *Generator) computeStaticValue(expr ast.NodeExpression) *int {
 func isFloatType(t typesys.Type) bool {
 	_, ok := t.(*typesys.FloatType)
 	return ok
+}
+
+func getDatalayout(triple string) (string, error) {
+  // Parse the triple: arch-vendor-os-environment
+	parts := strings.Split(triple, "-")
+	if len(parts) < 1 {
+		return "", fmt.Errorf("invalid LLVM triple: %s", triple)
+	}
+
+	arch := parts[0]
+	os := ""
+	if len(parts) > 2 {
+		os = parts[2]
+	}
+
+	// x86_64 variants
+	if arch == "x86_64" {
+		switch os {
+		case "darwin", "macos":
+			return "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+		case "linux", "gnu":
+			return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+		case "windows", "cygwin":
+			return "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+		default:
+			return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+		}
+	}
+
+	// ARM64/AArch64 variants
+	if arch == "aarch64" || arch == "arm64" {
+		switch os {
+		case "darwin", "macos":
+			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
+		case "linux", "gnu":
+			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
+		default:
+			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
+		}
+	}
+
+	// ARM (32-bit)
+	if arch == "arm" || arch == "armv7" {
+		switch os {
+		case "darwin", "macos":
+			return "e-m:o-p:32:32-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32", nil
+		case "linux", "gnu":
+			return "e-m:e-p:32:32-fi8-i64:64-v128:64:128-a:0:32-n32-S64", nil
+		default:
+			return "e-m:e-p:32:32-fi8-i64:64-v128:64:128-a:0:32-n32-S64", nil
+		}
+	}
+
+	// i386 (x86 32-bit)
+	if arch == "i386" || arch == "i686" {
+		switch os {
+		case "darwin", "macos":
+			return "e-m:o-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
+		case "linux", "gnu":
+			return "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
+		default:
+			return "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
+		}
+	}
+
+	return "", fmt.Errorf("unsupported target triple: %s", triple)
 }
