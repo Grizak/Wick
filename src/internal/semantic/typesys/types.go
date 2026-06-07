@@ -51,8 +51,10 @@ func (env *TypeEnvironment) Child() *TypeEnvironment {
 
 // TypeChecker validates type correctness
 type TypeChecker struct {
-	env      *TypeEnvironment
-	filename string
+	env       *TypeEnvironment
+	filename  string
+	loopDepth int // incremented when entering a loop, decremented when leaving
+
 }
 
 func NewTypeChecker() *TypeChecker {
@@ -93,6 +95,12 @@ func (tc *TypeChecker) CheckStatement(stmt *ast.NodeStatement) error {
 	}
 	if stmt.For != nil {
 		return tc.CheckFor(stmt.For)
+	}
+	if stmt.Break != nil {
+		return tc.CheckBreak(stmt.Break)
+	}
+	if stmt.Continue != nil {
+		return tc.CheckContinue(stmt.Continue)
 	}
 	return tc.error("unknown statement type", nil)
 }
@@ -432,7 +440,11 @@ func (tc *TypeChecker) CheckIf(node *ast.NodeIf) error {
 
 func (tc *TypeChecker) CheckFor(node *ast.NodeFor) error {
 	tc.EnterScope()
-	defer tc.ExitScope()
+	tc.loopDepth++
+	defer func() {
+		tc.ExitScope()
+		tc.loopDepth--
+	}()
 
 	// Check init statement
 	if node.Init != nil {
@@ -467,5 +479,19 @@ func (tc *TypeChecker) CheckFor(node *ast.NodeFor) error {
 		}
 	}
 
+	return nil
+}
+
+func (tc *TypeChecker) CheckBreak(node *ast.NodeBreak) error {
+	if tc.loopDepth == 0 {
+		return tc.error("break outside of loop", &node.Pos)
+	}
+	return nil
+}
+
+func (tc *TypeChecker) CheckContinue(node *ast.NodeContinue) error {
+	if tc.loopDepth == 0 {
+		return tc.error("continue outside of loop", &node.Pos)
+	}
 	return nil
 }
