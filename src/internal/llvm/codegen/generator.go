@@ -24,13 +24,15 @@ type Symbol struct {
 }
 
 type Generator struct {
-	root        *ast.NodeProgram
-	output      strings.Builder
-	tmpCount    int
-	fileName    string
-	typeChecker *typesys.TypeChecker
-	target      *target.Target
-	scope       *Scope
+	root          *ast.NodeProgram
+	output        strings.Builder
+	tmpCount      int
+	fileName      string
+	typeChecker   *typesys.TypeChecker
+	target        *target.Target
+	scope         *Scope
+	loopEndLabel  string
+	loopNextLabel string // for continue — goes to post statement then loop header
 }
 
 func NewGenerator(root *ast.NodeProgram) *Generator {
@@ -105,6 +107,12 @@ func (g *Generator) generateStatement(stmt *ast.NodeStatement) error {
 	}
 	if stmt.For != nil {
 		return g.generateFor(stmt.For)
+	}
+	if stmt.Break != nil {
+		return g.generateBreak(stmt.Break)
+	}
+	if stmt.Continue != nil {
+		return g.generateContinue(stmt.Continue)
 	}
 	return nil
 }
@@ -674,25 +682,35 @@ func (g *Generator) generateFor(node *ast.NodeFor) error {
 	defer g.exitScope()
 	defer g.typeChecker.ExitScope()
 
-	// Clear static values for all mutable variables since they may change
 	g.clearMutableStaticValues()
 
 	loopLabel := g.newLabel("loop")
 	bodyLabel := g.newLabel("body")
+	postLabel := g.newLabel("post")
 	endLabel := g.newLabel("loop_end")
 
-	// Init statement
+	// Save outer loop labels for nested loops
+	prevEndLabel := g.loopEndLabel
+	prevNextLabel := g.loopNextLabel
+	defer func() {
+		g.loopEndLabel = prevEndLabel
+		g.loopNextLabel = prevNextLabel
+	}()
+
+	g.loopEndLabel = endLabel
+	g.loopNextLabel = postLabel
+
+	// Init
 	if node.Init != nil {
 		if err := g.generateStatement(node.Init); err != nil {
 			return err
 		}
 	}
 
-	// Jump to loop header
 	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
 	g.writeLine(fmt.Sprintf("%s:", loopLabel))
 
-	// Condition check
+	// Condition
 	if node.Condition != nil {
 		cond, err := g.generateCondition(*node.Condition)
 		if err != nil {
@@ -700,7 +718,6 @@ func (g *Generator) generateFor(node *ast.NodeFor) error {
 		}
 		g.writeLine(fmt.Sprintf("    br i1 %s, label %%%s, label %%%s", cond, bodyLabel, endLabel))
 	} else {
-		// Infinite loop — unconditional branch to body
 		g.writeLine(fmt.Sprintf("    br label %%%s", bodyLabel))
 	}
 
@@ -711,18 +728,17 @@ func (g *Generator) generateFor(node *ast.NodeFor) error {
 			return err
 		}
 	}
+	g.writeLine(fmt.Sprintf("    br label %%%s", postLabel))
 
-	// Post statement
+	// Post
+	g.writeLine(fmt.Sprintf("%s:", postLabel))
 	if node.Post != nil {
 		if err := g.generateStatement(node.Post); err != nil {
 			return err
 		}
 	}
-
-	// Jump back to loop header
 	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
 
-	// End label
 	g.writeLine(fmt.Sprintf("%s:", endLabel))
 	return nil
 }
@@ -738,4 +754,20 @@ func (g *Generator) clearMutableStaticValues() {
 		}
 		scope = scope.parent
 	}
+}
+
+func (g *Generator) generateBreak(node *ast.NodeBreak) error {
+	if g.loopEndLabel == "" {
+		return g.error("break outside of loop", node.Pos)
+	}
+	g.writeLine(fmt.Sprintf("    br label %%%s", g.loopEndLabel))
+	return nil
+}
+
+func (g *Generator) generateContinue(node *ast.NodeContinue) error {
+	if g.loopNextLabel == "" {
+		return g.error("continue outside of loop", node.Pos)
+	}
+	g.writeLine(fmt.Sprintf("    br label %%%s", g.loopNextLabel))
+	return nil
 }
