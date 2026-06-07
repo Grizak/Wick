@@ -14,6 +14,8 @@ type Lexer struct {
 	file    string
 }
 
+const EOF rune = 0
+
 var singleCharTokens = map[rune]types.TokenType{
 	'(': types.TokenOpenParen,
 	')': types.TokenCloseParen,
@@ -76,6 +78,16 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 			t.consume()
 			output <- types.LexerResult{Token: types.Token{Type: tokenType, Pos: t.pos()}}
 			continue
+		}
+
+		// Comments
+		if t.peek(0) == '/' && t.peek(1) == '/' {
+			for {
+				if t.peek(0) == '\n' || t.peek(0) == EOF {
+					break
+				}
+				t.consume()
+			}
 		}
 
 		// Whitespace
