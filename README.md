@@ -1,14 +1,19 @@
 # Wick
 
-A compiled, statically typed programming language with a clean, Python-inspired syntax.
+A compiled, statically typed programming language with a clean, Python-inspired syntax that compiles to native executables via LLVM IR.
 
 ## Features
 
 - Clean, minimal syntax
 - Static typing with type inference
+- Constant folding at compile time
+- Scoped blocks
+- `if`/`else` control flow
+- `for` loops (infinite, while-style, and C-style)
+- `break`/`continue`
 - Compiles to native executables via LLVM IR
 - Self-contained compiler binary — no external dependencies required
-- Cross-compilation support (Linux and macOS targets from any host)
+- Cross-compilation support
 
 ## Installation
 
@@ -23,7 +28,7 @@ wickc input.wi -o output
 # Cross-compile to a specific target
 wickc input.wi -o output -t linux/amd64
 
-# Save intermediary files (.ll, .asm and .o)
+# Save intermediary files (.ll and .o)
 wickc input.wi -o output -s
 ```
 
@@ -48,29 +53,67 @@ wickc input.wi -o output -s
 
 ## Syntax
 
+### Comments
+
+```wick
+// This is a line comment
+```
+
 ### Variables
 
 ```wick
-# Mutable variable with type inference
+// Mutable variable with type inference
 let x = 42
 
-# Mutable variable with explicit type
+// Mutable variable with explicit type
 let x: int = 42
 
-# Immutable constant
+// Immutable constant
 const x = 42
 const x: int = 42
 
-# Reassignment
+// Reassignment
 x = 100
 ```
 
-### Expressions
+### Arithmetic
 
 ```wick
-# Arithmetic
 let x = 1 + 2
 let y = x * 3 - (4 / 2)
+```
+
+### Control Flow
+
+```wick
+if x > 10 {
+    // ...
+} else if x > 5 {
+    // ...
+} else {
+    // ...
+}
+```
+
+### Loops
+
+```wick
+// Infinite loop
+for {
+    break
+}
+
+// While-style
+for x > 0 {
+    x = x - 1
+}
+
+// C-style
+for let i = 0; i < 10; i = i + 1 {
+    if i == 5 {
+        continue
+    }
+}
 ```
 
 ### Exit
@@ -90,7 +133,15 @@ cd Wick
 make
 ```
 
-The compiler binary will be at `build/wickc`.
+The compiler binary will be at `build/wick`.
+
+## Roadmap
+
+- [ ] Functions
+- [ ] Built-in functions (`print`, etc.)
+- [ ] More types (`bool`, `float`, `string`)
+- [ ] Arrays
+- [ ] Pointers
 
 ## License
 
