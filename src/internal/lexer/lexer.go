@@ -29,14 +29,16 @@ var singleCharTokens = map[rune]types.TokenType{
 }
 
 var keywords = map[string]types.TokenType{
-	"exit":  types.TokenExit,
-	"const": types.TokenConst,
-	"let":   types.TokenLet,
-	"true":  types.TokenTrue,
-	"false": types.TokenFalse,
-	"if":    types.TokenIf,
-	"else":  types.TokenElse,
-	"for":   types.TokenFor,
+	"exit":     types.TokenExit,
+	"const":    types.TokenConst,
+	"let":      types.TokenLet,
+	"true":     types.TokenTrue,
+	"false":    types.TokenFalse,
+	"if":       types.TokenIf,
+	"else":     types.TokenElse,
+	"for":      types.TokenFor,
+	"break":    types.TokenBreak,
+	"continue": types.TokenContinue,
 }
 
 type Lexer struct {

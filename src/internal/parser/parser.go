@@ -140,6 +140,19 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				return nil, err
 			}
 			stmts = append(stmts, ast.NodeStatement{For: forStmt})
+		case types.TokenBreak:
+			token, err := p.consume()
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{Break: &ast.NodeBreak{Pos: token.Pos}})
+
+		case types.TokenContinue:
+			token, err := p.consume()
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{Continue: &ast.NodeContinue{Pos: token.Pos}})
 		default:
 			return nil, p.error("unexpected token", token)
 		}

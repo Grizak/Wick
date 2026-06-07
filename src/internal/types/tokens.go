@@ -36,6 +36,8 @@ const (
 	TokenNotEq        TokenType = "!="
 	TokenFor          TokenType = "for"
 	TokenSemicolon    TokenType = ";"
+	TokenBreak        TokenType = "break"
+	TokenContinue     TokenType = "continue"
 )
 
 type Token struct {
