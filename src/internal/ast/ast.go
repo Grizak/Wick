@@ -11,6 +11,9 @@ type NodeStatement struct {
 	Exit      *NodeExit
 	VarDecl   *NodeVarDecl
 	VarAssign *NodeVarAssign
+	Block     *NodeBlock
+	If        *NodeIf
+	For       *NodeFor
 }
 
 type NodeExit struct {
@@ -54,4 +57,24 @@ type NodeVarAssign struct {
 	Name string
 	Expr NodeExpression
 	Pos  types.Position
+}
+
+type NodeBlock struct {
+	Statements []NodeStatement
+	Pos        types.Position
+}
+
+type NodeIf struct {
+	Condition NodeExpression
+	Then      NodeBlock
+	Else      *NodeBlock // Nil if no else branch
+	Pos       types.Position
+}
+
+type NodeFor struct {
+	Init      *NodeStatement  // nil for while-style and infinite
+	Condition *NodeExpression // nil for infinite loop
+	Post      *NodeStatement  // nil for while-style and infinite
+	Body      NodeBlock
+	Pos       types.Position
 }
