@@ -1,2 +1,27 @@
 let x: int = 4*8
-exit(2*x+44*16) // 2^8 = 256 768%256 = 0
+{
+  let y = 24
+  x = x+y
+}
+
+if x < 8 {
+  exit(0)
+} else {
+  x = x+1
+}
+
+// C-style for loop — sum 1 to 10
+let sum = 0
+for let i = 1; i <= 10; i = i + 1 {
+    sum = sum + i
+}
+// sum should be 55
+
+// While-style loop — divide by 2 until < 10
+let y = 200
+for y > 10 {
+    y = y / 2
+}
+// y should be 6 (200 -> 100 -> 50 -> 25 -> 12 -> 6)
+
+exit(2*x+44*16+sum+y)

@@ -49,66 +49,99 @@ func (p *Parser) consume() (types.Token, error) {
 
 // Read from input, block when input is empty
 func (p *Parser) Parse(input chan types.LexerResult) (ast.NodeProgram, error) {
-	var program ast.NodeProgram
-	program.Filename = p.filename
 	p.input = input
+	var program ast.NodeProgram
+	stmts, err := p.parseStatements(types.TokenEOF)
+	if err != nil {
+		return program, err
+	}
+	program.Statements = stmts
+	return program, nil
+}
+
+func (p *Parser) parseBlock() (*ast.NodeBlock, error) {
+	openBrace, err := p.expect(types.TokenOpenBrace)
+	if err != nil {
+		return nil, err
+	}
+	stmts, err := p.parseStatements(types.TokenCloseBrace)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(types.TokenCloseBrace); err != nil {
+		return nil, err
+	}
+	return &ast.NodeBlock{
+		Statements: stmts,
+		Pos:        openBrace.Pos,
+	}, nil
+}
+
+func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatement, error) {
+	var stmts []ast.NodeStatement
 
 	for {
 		token := p.peek(0)
 
+		if token.Type == terminator {
+			return stmts, nil
+		}
+
 		switch token.Type {
 		case types.TokenExit:
-			_, err := p.consume()
-			if err != nil {
-				return program, err
-			}
+			p.consume()
 			exit, err := p.parseExit()
 			if err != nil {
-				return program, err
+				return nil, err
 			}
-			program.Statements = append(program.Statements, ast.NodeStatement{Exit: exit})
+			stmts = append(stmts, ast.NodeStatement{Exit: exit})
+		case types.TokenLet:
+			p.consume()
+			decl, err := p.parseVarDecl(false)
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{VarDecl: decl})
 		case types.TokenConst:
-			_, err := p.consume()
+			p.consume()
+			decl, err := p.parseVarDecl(true)
 			if err != nil {
-				return program, err
+				return nil, err
 			}
-			varDecl, err := p.parseVarDecl(true)
-			if err != nil {
-				return program, err
-			}
-			program.Statements = append(program.Statements, ast.NodeStatement{VarDecl: varDecl})
+			stmts = append(stmts, ast.NodeStatement{VarDecl: decl})
 		case types.TokenIdent:
-			// Peek ahead to disambiguate
 			next := p.peek(1)
 			if next.Type == types.TokenEquals {
-				varAssign, err := p.parseVarAssign()
+				assign, err := p.parseVarAssign()
 				if err != nil {
-					return program, err
+					return nil, err
 				}
-				program.Statements = append(program.Statements, ast.NodeStatement{VarAssign: varAssign})
+				stmts = append(stmts, ast.NodeStatement{VarAssign: assign})
 			} else {
-				return program, p.error("expected `=` after identifier", token)
+				return nil, p.error("expected `=` after identifier", token)
 			}
-		case types.TokenLet:
-			_, err := p.consume()
+		case types.TokenOpenBrace:
+			block, err := p.parseBlock()
 			if err != nil {
-				return program, err
+				return nil, err
 			}
-			varDecl, err := p.parseVarDecl(false)
+			stmts = append(stmts, ast.NodeStatement{Block: block})
+		case types.TokenIf:
+			p.consume()
+			ifStmt, err := p.parseIf()
 			if err != nil {
-				return program, err
+				return nil, err
 			}
-			program.Statements = append(program.Statements, ast.NodeStatement{VarDecl: varDecl})
-		case types.TokenOpenParen:
-			return program, p.error("unexpected `(`", token)
-		case types.TokenCloseParen:
-			return program, p.error("unexpected `)`", token)
-		case types.TokenIntLit:
-			return program, p.error("unexpected int literal", token)
-		case types.TokenEOF:
-			return program, nil
+			stmts = append(stmts, ast.NodeStatement{If: ifStmt})
+		case types.TokenFor:
+			p.consume()
+			forStmt, err := p.parseFor()
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{For: forStmt})
 		default:
-			return program, p.error("unexpected token", token)
+			return nil, p.error("unexpected token", token)
 		}
 	}
 }
@@ -118,7 +151,7 @@ func (p *Parser) parseExit() (*ast.NodeExit, error) {
 	if err != nil {
 		return &ast.NodeExit{}, err
 	}
-	expr, err := p.parseExpression()
+	expr, err := p.parseComparison()
 	if err != nil {
 		return &ast.NodeExit{}, err
 	}
@@ -128,6 +161,61 @@ func (p *Parser) parseExit() (*ast.NodeExit, error) {
 	}
 
 	return &ast.NodeExit{Expr: expr, Pos: expr.Pos}, nil
+}
+
+// Call parseComparison instead of parseExpression at the top level
+func (p *Parser) parseComparison() (ast.NodeExpression, error) {
+	left, err := p.parseExpression()
+	if err != nil {
+		return ast.NodeExpression{}, err
+	}
+
+	switch p.peek(0).Type {
+	case types.TokenEqEq:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpEq, Right: right}}, nil
+	case types.TokenNotEq:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpNotEq, Right: right}}, nil
+	case types.TokenLt:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpLt, Right: right}}, nil
+	case types.TokenGt:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpGt, Right: right}}, nil
+	case types.TokenLtEq:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpLtEq, Right: right}}, nil
+	case types.TokenGtEq:
+		p.consume()
+		right, err := p.parseExpression()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpGtEq, Right: right}}, nil
+	}
+
+	return left, nil
 }
 
 func (p *Parser) parseExpression() (ast.NodeExpression, error) {
@@ -378,7 +466,7 @@ func (p *Parser) parseVarDecl(isConst bool) (*ast.NodeVarDecl, error) {
 	if err != nil {
 		return nil, err
 	}
-	expr, err := p.parseExpression()
+	expr, err := p.parseComparison()
 	if err != nil {
 		return &ast.NodeVarDecl{}, err
 	}
@@ -401,7 +489,7 @@ func (p *Parser) parseVarAssign() (*ast.NodeVarAssign, error) {
 	if err != nil {
 		return &ast.NodeVarAssign{}, err
 	}
-	expr, err := p.parseExpression()
+	expr, err := p.parseComparison()
 	if err != nil {
 		return &ast.NodeVarAssign{}, err
 	}
@@ -468,4 +556,174 @@ func (p *Parser) parseType() (string, error) {
 	}
 
 	return typeStr.String(), nil
+}
+
+func (p *Parser) parseIf() (*ast.NodeIf, error) {
+	pos := p.peek(0).Pos
+
+	condition, err := p.parseComparison()
+	if err != nil {
+		return nil, err
+	}
+
+	then, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	var elseBlock *ast.NodeBlock
+	if p.peek(0).Type == types.TokenElse {
+		p.consume()
+		// else if
+		if p.peek(0).Type == types.TokenIf {
+			p.consume()
+			elseIf, err := p.parseIf()
+			if err != nil {
+				return nil, err
+			}
+			// wrap the else if in a block
+			elseBlock = &ast.NodeBlock{
+				Statements: []ast.NodeStatement{{If: elseIf}},
+				Pos:        elseIf.Pos,
+			}
+		} else {
+			elseBlock, err = p.parseBlock()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &ast.NodeIf{
+		Condition: condition,
+		Then:      *then,
+		Else:      elseBlock,
+		Pos:       pos,
+	}, nil
+}
+
+func (p *Parser) parseFor() (*ast.NodeFor, error) {
+	pos := p.peek(0).Pos
+
+	// Infinite loop: for {
+	if p.peek(0).Type == types.TokenOpenBrace {
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		return &ast.NodeFor{
+			Body: *body,
+			Pos:  pos,
+		}, nil
+	}
+
+	// Peek ahead to see if this is a C-style for
+	// by checking if the first statement is followed by a semicolon
+	// We need to try parsing an init statement and see if ; follows
+	isCStyle := p.isCStyleFor()
+
+	if isCStyle {
+		return p.parseCStyleFor(pos)
+	}
+
+	// While-style: for <condition> { }
+	condition, err := p.parseComparison()
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.NodeFor{
+		Condition: &condition,
+		Body:      *body,
+		Pos:       pos,
+	}, nil
+}
+
+func (p *Parser) isCStyleFor() bool {
+	i := 0
+	depth := 0
+	for {
+		token := p.peek(i)
+		switch token.Type {
+		case types.TokenOpenParen:
+			depth++
+		case types.TokenCloseParen:
+			depth--
+		case types.TokenSemicolon:
+			if depth == 0 {
+				return true
+			}
+		case types.TokenOpenBrace, types.TokenEOF:
+			return false
+		}
+		i++
+	}
+}
+
+func (p *Parser) parseCStyleFor(pos types.Position) (*ast.NodeFor, error) {
+	// Init statement
+	init, err := p.parseForStatement()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(types.TokenSemicolon); err != nil {
+		return nil, err
+	}
+
+	// Condition
+	condition, err := p.parseComparison()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(types.TokenSemicolon); err != nil {
+		return nil, err
+	}
+
+	// Post statement
+	post, err := p.parseForStatement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Body
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ast.NodeFor{
+		Init:      init,
+		Condition: &condition,
+		Post:      post,
+		Body:      *body,
+		Pos:       pos,
+	}, nil
+}
+
+func (p *Parser) parseForStatement() (*ast.NodeStatement, error) {
+	token := p.peek(0)
+
+	switch token.Type {
+	case types.TokenLet:
+		p.consume()
+		decl, err := p.parseVarDecl(false)
+		if err != nil {
+			return nil, err
+		}
+		return &ast.NodeStatement{VarDecl: decl}, nil
+	case types.TokenIdent:
+		if p.peek(1).Type == types.TokenEquals {
+			assign, err := p.parseVarAssign()
+			if err != nil {
+				return nil, err
+			}
+			return &ast.NodeStatement{VarAssign: assign}, nil
+		}
+		return nil, p.error("expected `=` after identifier", token)
+	default:
+		return nil, p.error("expected variable declaration or assignment", token)
+	}
 }

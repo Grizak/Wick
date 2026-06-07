@@ -7,8 +7,14 @@ import (
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
+	"github.com/Grizak/Wick/src/internal/target"
 	"github.com/Grizak/Wick/src/internal/types"
 )
+
+type Scope struct {
+	symbols map[string]Symbol
+	parent  *Scope
+}
 
 type Symbol struct {
 	llvmName    string
@@ -21,57 +27,44 @@ type Generator struct {
 	root        *ast.NodeProgram
 	output      strings.Builder
 	tmpCount    int
-	symbols     map[string]Symbol
 	fileName    string
 	typeChecker *typesys.TypeChecker
+	target      *target.Target
+	scope       *Scope
 }
 
 func NewGenerator(root *ast.NodeProgram) *Generator {
 	g := Generator{
 		root:        root,
 		tmpCount:    0,
-		symbols:     make(map[string]Symbol),
 		typeChecker: typesys.NewTypeChecker(),
+		scope:       NewScope(nil),
 	}
 
 	return &g
 }
 
-func (g *Generator) Generate(fileName, target string) (string, error) {
+func (g *Generator) Generate(fileName, triple string) (string, error) {
 	g.fileName = fileName
+	target, err := target.NewTarget(triple)
+	if err != nil {
+		return "", err
+	}
+	g.target = &target
 	// Write some metadata about the file (based on target)
-	g.writeLine(fmt.Sprintf(`target triple = "%s"`, target))
-  datalayout, err := getDatalayout(target)
-  if err != nil {
-    return "", err
-  }
-	g.writeLine(fmt.Sprintf(`target datalayout = "%s"`, datalayout))
+	g.writeLine(fmt.Sprintf(`target triple = "%s"`, triple))
+	g.writeLine(fmt.Sprintf(`target datalayout = "%s"`, target.DataLayout()))
 
 	g.writeLine(fmt.Sprintf(`source_filename = "%s"`, fileName))
 
 	// Write LLVM IR module header
 	g.writeLine("")
-	g.writeLine(fmt.Sprintf(`define void @%s() {`, entryPoint(target)))
+	g.writeLine(fmt.Sprintf(`define void @%s() {`, target.EntryPoint()))
 	g.writeLine(`entry:`)
 
-	exitCount := 0
-
 	for _, statement := range g.root.Statements {
-		if statement.Exit != nil {
-			exitCount++
-			if err := g.generateExit(statement.Exit); err != nil {
-				return "", err
-			}
-		}
-		if statement.VarDecl != nil {
-			if err := g.generateVarDecl(statement.VarDecl); err != nil {
-				return "", err
-			}
-		}
-		if statement.VarAssign != nil {
-			if err := g.generateVarAssign(statement.VarAssign); err != nil {
-				return "", err
-			}
+		if err := g.generateStatement(&statement); err != nil {
+			return "", err
 		}
 	}
 
@@ -79,22 +72,41 @@ func (g *Generator) Generate(fileName, target string) (string, error) {
 	g.writeLine(`}`)
 	g.writeLine("")
 
-	if exitCount > 0 {
-		g.writeLine(`define void @exit(i32 %code) {`)
-		g.writeLine("entry:")
-		g.writeLine("    %code64 = sext i32 %code to i64")
-		if err := g.generateExitSyscall(target); err != nil {
-			return "", err
-		}
-		g.writeLine("    unreachable")
-		g.writeLine("}")
+	// Exit func
+	g.writeLine(`define void @exit(i32 %code) {`)
+	g.writeLine("entry:")
+	g.writeLine("    %code64 = sext i32 %code to i64")
+	g.writeLine("    call void " + target.SysExit())
+	g.writeLine("    unreachable")
+	g.writeLine("}")
 
-		if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
-			g.writeLine(`declare void @ExitProcess(i32)`)
-		}
+	if triple == "x86_64-pc-windows-msvc" || triple == "aarch64-pc-windows-msvc" {
+		g.writeLine(`declare void @ExitProcess(i32)`)
 	}
 
 	return g.output.String(), nil
+}
+
+func (g *Generator) generateStatement(stmt *ast.NodeStatement) error {
+	if stmt.Exit != nil {
+		return g.generateExit(stmt.Exit)
+	}
+	if stmt.VarDecl != nil {
+		return g.generateVarDecl(stmt.VarDecl)
+	}
+	if stmt.VarAssign != nil {
+		return g.generateVarAssign(stmt.VarAssign)
+	}
+	if stmt.Block != nil {
+		return g.generateBlock(stmt.Block)
+	}
+	if stmt.If != nil {
+		return g.generateIf(stmt.If)
+	}
+	if stmt.For != nil {
+		return g.generateFor(stmt.For)
+	}
+	return nil
 }
 
 func (g *Generator) generateExit(exit *ast.NodeExit) error {
@@ -238,7 +250,7 @@ func (g *Generator) generateExpression(expr ast.NodeExpression) (string, error) 
 	}
 
 	if expr.Ident != nil {
-		sym, exists := g.symbols[*expr.Ident]
+		sym, exists := g.scope.lookup(*expr.Ident)
 		if !exists {
 			return "", g.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), expr.Pos)
 		}
@@ -264,12 +276,15 @@ func (g *Generator) isStatic(expr ast.NodeExpression) bool {
 	if expr.IntLit != nil {
 		return true
 	}
+	if expr.FloatLit != nil {
+		return true
+	}
 	if expr.Ident != nil {
-		sym, exists := g.symbols[*expr.Ident]
+		sym, exists := g.scope.lookup(*expr.Ident)
 		if !exists {
 			return false
 		}
-		return sym.staticValue != nil
+		return sym.isConst && sym.staticValue != nil
 	}
 	if expr.BinExpr != nil {
 		return g.isStatic(expr.BinExpr.Left) && g.isStatic(expr.BinExpr.Right)
@@ -309,7 +324,7 @@ func (g *Generator) foldExpression(expr ast.NodeExpression) (int, error) {
 		return *expr.IntLit, nil
 	}
 	if expr.Ident != nil {
-		sym, exists := g.symbols[*expr.Ident]
+		sym, exists := g.scope.lookup(*expr.Ident)
 		if !exists {
 			return 0, g.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), expr.Pos)
 		}
@@ -329,45 +344,12 @@ func (g *Generator) foldExpression(expr ast.NodeExpression) (int, error) {
 	return 0, g.error("unknown expression type", expr.Pos)
 }
 
-func (g *Generator) generateExitSyscall(target string) error {
-	switch target {
-	case "x86_64-pc-linux-gnu":
-		g.writeLine("    call void asm sideeffect \"syscall\", \"{rax},{rdi}\" (i64 60, i64 %code64)")
-	case "aarch64-pc-linux-gnu":
-		g.writeLine("    call void asm sideeffect \"svc #0\", \"{x8},{x0}\" (i64 93, i64 %code64)")
-	case "x86_64-apple-darwin":
-		g.writeLine("    call void asm sideeffect \"syscall\", \"{rax},{rdi}\" (i64 0x2000001, i64 %code64)")
-	case "aarch64-apple-darwin":
-		g.writeLine("    call void asm sideeffect \"svc #0x80\", \"{x16},{x0}\" (i64 1, i64 %code64)")
-	case "x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc":
-		g.writeLine("    call void @ExitProcess(i32 %code)")
-	default:
-		return g.error(fmt.Sprintf("unsupported target: %s", target), types.Position{})
-	}
-	return nil
-}
-
-func entryPoint(target string) string {
-	switch target {
-	case "x86_64-apple-darwin", "aarch64-apple-darwin":
-		return "_main"
-	case "x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc":
-		return "mainCRTStartup"
-	default:
-		return "_start"
-	}
-}
-
 func (g *Generator) tmpVar() string {
 	g.tmpCount++
 	return fmt.Sprintf("%%tmp%d", g.tmpCount)
 }
 
 func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
-	if _, exists := g.symbols[decl.Name]; exists {
-		return g.error(fmt.Sprintf("variable already declared: %s", decl.Name), decl.Pos)
-	}
-
 	// Always infer the expression type first
 	exprType, err := g.typeChecker.InferType(&decl.Expr)
 	if err != nil {
@@ -414,7 +396,8 @@ func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
 	}
 
 	if !decl.Const {
-		ptr := fmt.Sprintf("%%var_%s", decl.Name)
+		ptr := fmt.Sprintf("%%var_%s_%d", decl.Name, g.tmpCount+1)
+		g.tmpCount++
 		llvmType := varType.LLVMType()
 		g.writeLine(fmt.Sprintf("    %s = alloca %s", ptr, llvmType))
 		g.writeLine(fmt.Sprintf("    store %s %s, ptr %s", llvmType, expr, ptr))
@@ -422,12 +405,12 @@ func (g *Generator) generateVarDecl(decl *ast.NodeVarDecl) error {
 	}
 
 	g.typeChecker.Environment().Define(decl.Name, varType)
-	g.symbols[decl.Name] = sym
+	g.scope.declare(decl.Name, sym)
 	return nil
 }
 
 func (g *Generator) generateVarAssign(assign *ast.NodeVarAssign) error {
-	sym, exists := g.symbols[assign.Name]
+	sym, exists := g.scope.lookup(assign.Name)
 	if !exists {
 		return g.error(fmt.Sprintf("undeclared variable: %s", assign.Name), assign.Pos)
 	}
@@ -461,7 +444,7 @@ func (g *Generator) generateVarAssign(assign *ast.NodeVarAssign) error {
 
 	// Update static value tracking
 	sym.staticValue = g.computeStaticValue(assign.Expr)
-	g.symbols[assign.Name] = sym
+	g.scope.update(assign.Name, sym)
 
 	llvmType := sym.symbolType.LLVMType()
 	g.writeLine(fmt.Sprintf("    store %s %s, ptr %s", llvmType, expr, sym.llvmName))
@@ -482,7 +465,7 @@ func (g *Generator) computeStaticValue(expr ast.NodeExpression) *int {
 	}
 	v, err := g.foldExpression(expr)
 	if err != nil {
-		return nil
+		return nil // folding failed, treat as non-static
 	}
 	return &v
 }
@@ -493,68 +476,266 @@ func isFloatType(t typesys.Type) bool {
 	return ok
 }
 
-func getDatalayout(triple string) (string, error) {
-  // Parse the triple: arch-vendor-os-environment
-	parts := strings.Split(triple, "-")
-	if len(parts) < 1 {
-		return "", fmt.Errorf("invalid LLVM triple: %s", triple)
+func NewScope(parent *Scope) *Scope {
+	return &Scope{
+		symbols: make(map[string]Symbol),
+		parent:  parent,
+	}
+}
+
+func (s *Scope) lookup(name string) (Symbol, bool) {
+	if sym, ok := s.symbols[name]; ok {
+		return sym, true
+	}
+	if s.parent != nil {
+		return s.parent.lookup(name)
+	}
+	return Symbol{}, false
+}
+
+func (s *Scope) declare(name string, sym Symbol) error {
+	if _, exists := s.symbols[name]; exists {
+		return fmt.Errorf("variable already declared: %s", name)
+	}
+	s.symbols[name] = sym
+	return nil
+}
+
+func (g *Generator) enterScope() {
+	g.scope = NewScope(g.scope)
+}
+
+func (g *Generator) exitScope() {
+	g.scope = g.scope.parent
+}
+
+func (s *Scope) update(name string, sym Symbol) bool {
+	if _, ok := s.symbols[name]; ok {
+		s.symbols[name] = sym
+		return true
+	}
+	if s.parent != nil {
+		return s.parent.update(name, sym)
+	}
+	return false
+}
+
+func (g *Generator) generateBlock(block *ast.NodeBlock) error {
+	g.enterScope()
+	g.typeChecker.EnterScope()
+	defer g.exitScope()
+	defer g.typeChecker.ExitScope()
+
+	for _, stmt := range block.Statements {
+		g.generateStatement(&stmt)
+	}
+	return nil
+}
+
+func (g *Generator) generateIf(node *ast.NodeIf) error {
+	// Generate the condition
+	cond, err := g.generateCondition(node.Condition)
+	if err != nil {
+		return err
 	}
 
-	arch := parts[0]
-	os := ""
-	if len(parts) > 2 {
-		os = parts[2]
+	// Create unique labels
+	thenLabel := g.newLabel("then")
+	endLabel := g.newLabel("end")
+	elseLabel := endLabel
+	if node.Else != nil {
+		elseLabel = g.newLabel("else")
 	}
 
-	// x86_64 variants
-	if arch == "x86_64" {
-		switch os {
-		case "darwin", "macos":
-			return "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
-		case "linux", "gnu":
-			return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
-		case "windows", "cygwin":
-			return "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+	// Conditional branch
+	g.writeLine(fmt.Sprintf("    br i1 %s, label %%%s, label %%%s", cond, thenLabel, elseLabel))
+
+	// Then block
+	g.writeLine(fmt.Sprintf("%s:", thenLabel))
+	g.enterScope()
+	g.typeChecker.EnterScope()
+	for _, stmt := range node.Then.Statements {
+		if err := g.generateStatement(&stmt); err != nil {
+			return err
+		}
+	}
+	g.exitScope()
+	g.typeChecker.ExitScope()
+	g.writeLine(fmt.Sprintf("    br label %%%s", endLabel))
+
+	// Else block
+	if node.Else != nil {
+		g.writeLine(fmt.Sprintf("%s:", elseLabel))
+		g.enterScope()
+		g.typeChecker.EnterScope()
+		for _, stmt := range node.Else.Statements {
+			if err := g.generateStatement(&stmt); err != nil {
+				return err
+			}
+		}
+		g.exitScope()
+		g.typeChecker.ExitScope()
+		g.writeLine(fmt.Sprintf("    br label %%%s", endLabel))
+	}
+
+	// End label
+	g.writeLine(fmt.Sprintf("%s:", endLabel))
+	return nil
+}
+
+func (g *Generator) generateCondition(expr ast.NodeExpression) (string, error) {
+	// If it's a bool literal
+	if expr.BoolLit != nil {
+		if *expr.BoolLit {
+			return "1", nil
+		}
+		return "0", nil
+	}
+
+	// If it's a comparison expression
+	if expr.BinExpr != nil {
+		leftType, err := g.typeChecker.InferType(&expr.BinExpr.Left)
+		if err != nil {
+			return "", g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
+		}
+
+		left, err := g.generateExpression(expr.BinExpr.Left)
+		if err != nil {
+			return "", err
+		}
+		right, err := g.generateExpression(expr.BinExpr.Right)
+		if err != nil {
+			return "", err
+		}
+
+		result := g.tmpVar()
+		isFloat := isFloatType(leftType)
+
+		switch expr.BinExpr.Op {
+		case types.BinOpEq:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp oeq double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp eq i64 %s, %s", result, left, right))
+			}
+		case types.BinOpNotEq:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp one double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp ne i64 %s, %s", result, left, right))
+			}
+		case types.BinOpLt:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp olt double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp slt i64 %s, %s", result, left, right))
+			}
+		case types.BinOpGt:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp ogt double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp sgt i64 %s, %s", result, left, right))
+			}
+		case types.BinOpLtEq:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp ole double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp sle i64 %s, %s", result, left, right))
+			}
+		case types.BinOpGtEq:
+			if isFloat {
+				g.writeLine(fmt.Sprintf("    %s = fcmp oge double %s, %s", result, left, right))
+			} else {
+				g.writeLine(fmt.Sprintf("    %s = icmp sge i64 %s, %s", result, left, right))
+			}
 		default:
-			return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", nil
+			return "", g.error(fmt.Sprintf("not a comparison operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
+		}
+
+		return result, nil
+	}
+
+	// If it's an ident of bool type
+	if expr.Ident != nil {
+		return g.generateExpression(expr)
+	}
+
+	return "", g.error("expected a boolean expression", expr.Pos)
+}
+
+func (g *Generator) newLabel(prefix string) string {
+	g.tmpCount++
+	return fmt.Sprintf("%s_%d", prefix, g.tmpCount)
+}
+
+func (g *Generator) generateFor(node *ast.NodeFor) error {
+	g.enterScope()
+	g.typeChecker.EnterScope()
+	defer g.exitScope()
+	defer g.typeChecker.ExitScope()
+
+	// Clear static values for all mutable variables since they may change
+	g.clearMutableStaticValues()
+
+	loopLabel := g.newLabel("loop")
+	bodyLabel := g.newLabel("body")
+	endLabel := g.newLabel("loop_end")
+
+	// Init statement
+	if node.Init != nil {
+		if err := g.generateStatement(node.Init); err != nil {
+			return err
 		}
 	}
 
-	// ARM64/AArch64 variants
-	if arch == "aarch64" || arch == "arm64" {
-		switch os {
-		case "darwin", "macos":
-			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
-		case "linux", "gnu":
-			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
-		default:
-			return "e-m:e-i8:8:32-i16:16:32-i32:32-i64:64-i128:128-n32:64-S128", nil
+	// Jump to loop header
+	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
+	g.writeLine(fmt.Sprintf("%s:", loopLabel))
+
+	// Condition check
+	if node.Condition != nil {
+		cond, err := g.generateCondition(*node.Condition)
+		if err != nil {
+			return err
+		}
+		g.writeLine(fmt.Sprintf("    br i1 %s, label %%%s, label %%%s", cond, bodyLabel, endLabel))
+	} else {
+		// Infinite loop — unconditional branch to body
+		g.writeLine(fmt.Sprintf("    br label %%%s", bodyLabel))
+	}
+
+	// Body
+	g.writeLine(fmt.Sprintf("%s:", bodyLabel))
+	for _, stmt := range node.Body.Statements {
+		if err := g.generateStatement(&stmt); err != nil {
+			return err
 		}
 	}
 
-	// ARM (32-bit)
-	if arch == "arm" || arch == "armv7" {
-		switch os {
-		case "darwin", "macos":
-			return "e-m:o-p:32:32-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32", nil
-		case "linux", "gnu":
-			return "e-m:e-p:32:32-fi8-i64:64-v128:64:128-a:0:32-n32-S64", nil
-		default:
-			return "e-m:e-p:32:32-fi8-i64:64-v128:64:128-a:0:32-n32-S64", nil
+	// Post statement
+	if node.Post != nil {
+		if err := g.generateStatement(node.Post); err != nil {
+			return err
 		}
 	}
 
-	// i386 (x86 32-bit)
-	if arch == "i386" || arch == "i686" {
-		switch os {
-		case "darwin", "macos":
-			return "e-m:o-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
-		case "linux", "gnu":
-			return "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
-		default:
-			return "e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128", nil
-		}
-	}
+	// Jump back to loop header
+	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
 
-	return "", fmt.Errorf("unsupported target triple: %s", triple)
+	// End label
+	g.writeLine(fmt.Sprintf("%s:", endLabel))
+	return nil
+}
+
+func (g *Generator) clearMutableStaticValues() {
+	scope := g.scope
+	for scope != nil {
+		for name, sym := range scope.symbols {
+			if !sym.isConst {
+				sym.staticValue = nil
+				scope.symbols[name] = sym
+			}
+		}
+		scope = scope.parent
+	}
 }

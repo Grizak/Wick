@@ -8,6 +8,8 @@ const (
 	TokenCloseParen   TokenType = ")"
 	TokenOpenBracket  TokenType = "["
 	TokenCloseBracket TokenType = "]"
+	TokenOpenBrace    TokenType = "{"
+	TokenCloseBrace   TokenType = "}"
 	TokenComma        TokenType = ","
 	TokenIntLit       TokenType = "int_lit"
 	TokenFloatLit     TokenType = "float_lit"
@@ -22,8 +24,18 @@ const (
 	TokenIdent        TokenType = "ident"
 	TokenConst        TokenType = "const"
 	TokenLet          TokenType = "let"
+	TokenIf           TokenType = "if"
+	TokenElse         TokenType = "else"
 	TokenColon        TokenType = ":"
 	TokenEquals       TokenType = "="
+	TokenLt           TokenType = "<"
+	TokenGt           TokenType = ">"
+	TokenLtEq         TokenType = "<="
+	TokenGtEq         TokenType = ">="
+	TokenEqEq         TokenType = "=="
+	TokenNotEq        TokenType = "!="
+	TokenFor          TokenType = "for"
+	TokenSemicolon    TokenType = ";"
 )
 
 type Token struct {

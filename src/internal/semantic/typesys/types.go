@@ -85,7 +85,28 @@ func (tc *TypeChecker) CheckStatement(stmt *ast.NodeStatement) error {
 	if stmt.VarAssign != nil {
 		return tc.CheckVarAssign(stmt.VarAssign)
 	}
+	if stmt.Block != nil {
+		return tc.CheckBlock(stmt.Block)
+	}
+	if stmt.If != nil {
+		return tc.CheckIf(stmt.If)
+	}
+	if stmt.For != nil {
+		return tc.CheckFor(stmt.For)
+	}
 	return tc.error("unknown statement type", nil)
+}
+
+func (tc *TypeChecker) CheckBlock(block *ast.NodeBlock) error {
+	tc.EnterScope()
+	defer tc.ExitScope()
+
+	for _, stmt := range block.Statements {
+		if err := tc.CheckStatement(&stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (tc *TypeChecker) CheckExit(exit *ast.NodeExit) error {
@@ -382,4 +403,69 @@ func (tc *TypeChecker) ExitScope() {
 	if tc.env.parent != nil {
 		tc.env = tc.env.parent
 	}
+}
+
+func (tc *TypeChecker) CheckIf(node *ast.NodeIf) error {
+	// Check condition is a bool expression
+	condType, err := tc.CheckExpression(node.Condition)
+	if err != nil {
+		return err
+	}
+	if !isBool(condType) {
+		return tc.error(fmt.Sprintf("if condition must be a bool, got %s", condType.Name()), &node.Pos)
+	}
+
+	// Check then block
+	if err := tc.CheckBlock(&node.Then); err != nil {
+		return err
+	}
+
+	// Check else block if present
+	if node.Else != nil {
+		if err := tc.CheckBlock(node.Else); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (tc *TypeChecker) CheckFor(node *ast.NodeFor) error {
+	tc.EnterScope()
+	defer tc.ExitScope()
+
+	// Check init statement
+	if node.Init != nil {
+		if err := tc.CheckStatement(node.Init); err != nil {
+			return err
+		}
+	}
+
+	// Check condition is bool
+	if node.Condition != nil {
+		condType, err := tc.CheckExpression(*node.Condition)
+		if err != nil {
+			return err
+		}
+		if !isBool(condType) {
+			return tc.error(fmt.Sprintf("for condition must be a bool, got %s", condType.Name()), &node.Pos)
+		}
+	}
+
+	// Check post statement
+	if node.Post != nil {
+		if err := tc.CheckStatement(node.Post); err != nil {
+			return err
+		}
+	}
+
+	// Check body — don't enter a new scope here since we already entered one
+	// to include the init variable
+	for _, stmt := range node.Body.Statements {
+		if err := tc.CheckStatement(&stmt); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
