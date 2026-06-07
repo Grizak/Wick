@@ -104,7 +104,7 @@ func (tc *TypeChecker) CheckVarDecl(decl *ast.NodeVarDecl) error {
 		if err != nil {
 			return tc.error(fmt.Sprintf("invalid type annotation for variable '%s': %v", decl.Name, err), &decl.Pos)
 		}
-		if !exprType.Equals(declaredType) && !tryCoerce(exprType, declaredType) {
+		if !exprType.Equals(declaredType) && !TryCoerce(exprType, declaredType) {
 			return tc.error(fmt.Sprintf("type mismatch for variable '%s': declared as %s but got %s", decl.Name, declaredType.Name(), exprType.Name()), &decl.Pos)
 		}
 		tc.env.Define(decl.Name, declaredType)
@@ -268,7 +268,7 @@ func (tc *TypeChecker) InferType(expr *ast.NodeExpression) (Type, error) {
 	return nil, tc.error("unknown expression type", &expr.Pos)
 }
 
-func tryCoerce(from, to Type) bool {
+func TryCoerce(from, to Type) bool {
 	if from.Equals(to) {
 		return true
 	}
@@ -363,7 +363,7 @@ func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (Type, error) {
 		}
 
 		// Allow coercion if argument type doesn't match exactly
-		if !argType.Equals(fn.ParamTypes[i]) && !tryCoerce(argType, fn.ParamTypes[i]) {
+		if !argType.Equals(fn.ParamTypes[i]) && !TryCoerce(argType, fn.ParamTypes[i]) {
 			return nil, tc.error(fmt.Sprintf("function %s argument %d: expected %s, got %s",
 				call.Name, i+1, fn.ParamTypes[i].Name(), argType.Name()), &call.Pos)
 		}

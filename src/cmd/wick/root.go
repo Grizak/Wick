@@ -9,7 +9,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "wick",
+	Use:   "wick [options/subcommand] <source files>",
 	Short: "The Wick compiler",
 
 	// --version
@@ -32,7 +32,6 @@ var rootCmd = &cobra.Command{
 				Output:             viper.GetString("output"),
 				SaveIntermediaries: viper.GetBool("save-intermediaries"),
 				Target:             target,
-				KeepOutput:         viper.GetBool("keep-output"),
 			},
 		)
 	},
@@ -45,6 +44,16 @@ func Execute() error {
 func init() {
 	viper.SetEnvPrefix("WICK")
 	viper.AutomaticEnv()
+
+	flags := rootCmd.PersistentFlags()
+
+	flags.StringP("output", "o", "dist/out", "Output file")
+	flags.BoolP("save-intermediaries", "s", false, "Save intermediary files")
+	flags.StringP("target", "t", "", "Compilation target (default: same as host, can also be set via WICK_TARGET environment variable)")
+
+	viper.BindPFlag("output", flags.Lookup("output"))
+	viper.BindPFlag("save-intermediaries", flags.Lookup("save-intermediaries"))
+	viper.BindPFlag("target", flags.Lookup("target"))
 
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
 }
