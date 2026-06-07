@@ -52,6 +52,19 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 			break
 		}
 
+		// Comments
+		if t.peek(0) == '/' && t.peek(1) == '/' {
+			t.consume()
+			t.consume()
+			for {
+				if t.peek(0) == '\n' || t.peek(0) == EOF {
+					break
+				}
+				t.consume()
+			}
+			continue
+		}
+
 		// String literals
 		if r == '"' {
 			t.consume() // consume opening quote
@@ -78,16 +91,6 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 			t.consume()
 			output <- types.LexerResult{Token: types.Token{Type: tokenType, Pos: t.pos()}}
 			continue
-		}
-
-		// Comments
-		if t.peek(0) == '/' && t.peek(1) == '/' {
-			for {
-				if t.peek(0) == '\n' || t.peek(0) == EOF {
-					break
-				}
-				t.consume()
-			}
 		}
 
 		// Whitespace
@@ -164,7 +167,7 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 func (t *Lexer) peek(offset int) rune {
 	// Bounds check
 	if t.index+offset >= len(t.content) {
-		return 0
+		return EOF
 	}
 
 	return rune(t.content[t.index+offset])
@@ -172,7 +175,7 @@ func (t *Lexer) peek(offset int) rune {
 
 func (t *Lexer) consume() rune {
 	if t.index >= len(t.content) {
-		return 0
+		return EOF
 	}
 
 	r := rune(t.content[t.index])
