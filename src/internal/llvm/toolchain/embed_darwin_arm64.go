@@ -15,3 +15,6 @@ var kernel32Lib []byte
 
 //go:embed bin/darwin_arm64/versions.json
 var versionsJSON []byte
+
+//go:embed bin/darwin_arm64/opt
+var optBinary []byte
