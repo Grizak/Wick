@@ -14,9 +14,9 @@ var versionCmd = &cobra.Command{
 	Short: "Print detailed version information",
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Wick version %s\n", version)
+		fmt.Printf("Wick version %s\n\n", version)
 		// LICENSE
-		fmt.Println(assets.License)
+		fmt.Println(assets.License[:len(assets.License)-1]) // Remove pending newline
 		return nil
 	},
 }
