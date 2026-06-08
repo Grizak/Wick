@@ -12,34 +12,34 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: rm -rf src/llvm/toolchain/bin/linux_amd64
+        run: rm -rf src/internal/llvm/toolchain/bin/linux_amd64
 
       - name: Download LLC && opt
         run: |
-          mkdir -p src/llvm/toolchain/bin/linux_amd64
+          mkdir -p src/internal/llvm/toolchain/bin/linux_amd64
           sudo apt-get install -y llvm
-          cp $(which llc) src/llvm/toolchain/bin/linux_amd64/llc
-          cp $(which opt) src/llvm/toolchain/bin/linux_amd64/opt
-          chmod +x src/llvm/toolchain/bin/linux_amd64/llc
-          chmod +x src/llvm/toolchain/bin/linux_amd64/opt
+          cp $(which llc) src/internal/llvm/toolchain/bin/linux_amd64/llc
+          cp $(which opt) src/internal/llvm/toolchain/bin/linux_amd64/opt
+          chmod +x src/internal/llvm/toolchain/bin/linux_amd64/llc
+          chmod +x src/internal/llvm/toolchain/bin/linux_amd64/opt
 
       - name: Download LLD
         run: |
           sudo apt-get install -y lld
-          cp $(which ld.lld) src/llvm/toolchain/bin/linux_amd64/ld.lld
-          chmod +x src/llvm/toolchain/bin/linux_amd64/ld.lld
+          cp $(which ld.lld) src/internal/llvm/toolchain/bin/linux_amd64/ld.lld
+          chmod +x src/internal/llvm/toolchain/bin/linux_amd64/ld.lld
 
       - name: Write versions
         run: |
           LLC_VERSION=$(llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$(ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           OPT_VERSION=$(opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/linux_amd64/versions.json
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/linux_amd64/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
           name: linux-amd64-tools
-          path: src/llvm/toolchain/bin/linux_amd64/
+          path: src/internal/llvm/toolchain/bin/linux_amd64/
 
   fetch-darwin-arm64:
     runs-on: macos-latest
@@ -47,22 +47,22 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: rm -rf src/llvm/toolchain/bin/darwin_arm64
+        run: rm -rf src/internal/llvm/toolchain/bin/darwin_arm64
 
       - name: Download LLC & opt
         run: |
-          mkdir -p src/llvm/toolchain/bin/darwin_arm64
+          mkdir -p src/internal/llvm/toolchain/bin/darwin_arm64
           brew install llvm
-          cp $(brew --prefix llvm)/bin/llc src/llvm/toolchain/bin/darwin_arm64/llc
-          cp $(brew --prefix llvm)/bin/opt src/llvm/toolchain/bin/darwin_arm64/opt
-          chmod +x src/llvm/toolchain/bin/darwin_arm64/llc
-          chmod +x src/llvm/toolchain/bin/darwin_arm64/opt
+          cp $(brew --prefix llvm)/bin/llc src/internal/llvm/toolchain/bin/darwin_arm64/llc
+          cp $(brew --prefix llvm)/bin/opt src/internal/llvm/toolchain/bin/darwin_arm64/opt
+          chmod +x src/internal/llvm/toolchain/bin/darwin_arm64/llc
+          chmod +x src/internal/llvm/toolchain/bin/darwin_arm64/opt
 
       - name: Download LLD
         run: |
           brew install lld
-          cp $(brew --prefix lld)/bin/ld64.lld src/llvm/toolchain/bin/darwin_arm64/ld64.lld
-          chmod +x src/llvm/toolchain/bin/darwin_arm64/ld64.lld
+          cp $(brew --prefix lld)/bin/ld64.lld src/internal/llvm/toolchain/bin/darwin_arm64/ld64.lld
+          chmod +x src/internal/llvm/toolchain/bin/darwin_arm64/ld64.lld
 
       - name: Write versions
         run: |
@@ -71,12 +71,12 @@ jobs:
           LLC_VERSION=$($LLVM_PREFIX/bin/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           OPT_VERSION=$($LLVM_PREFIX/bin/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/darwin_arm64/versions.json
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
           name: darwin-arm64-tools
-          path: src/llvm/toolchain/bin/darwin_arm64/
+          path: src/internal/llvm/toolchain/bin/darwin_arm64/
 
   fetch-windows-amd64:
     runs-on: windows-latest
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/llvm/toolchain/bin/windows_amd64
+        run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/internal/llvm/toolchain/bin/windows_amd64
 
       - name: Setup msys2 and install llvm
         uses: msys2/setup-msys2@v2
@@ -116,7 +116,7 @@ jobs:
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
-          git clone --depth 1 https://github.com/llvm/llvm-project.git
+          git clone --depth 1 https://github.com/internal/llvm/internal/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
@@ -144,32 +144,32 @@ jobs:
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
           ninja -C build llc lld opt
-          mkdir -p ../src/llvm/toolchain/bin/windows_amd64
-          cp build/bin/llc.exe ../src/llvm/toolchain/bin/windows_amd64/llc.exe
-          cp build/bin/lld-link.exe ../src/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          cp build/bin/opt.exe ../src/llvm/toolchain/bin/windows_amd64/opt.exe
-          chmod +x ../src/llvm/toolchain/bin/windows_amd64/llc.exe
-          chmod +x ../src/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          chmod +x ../src/llvm/toolchain/bin/windows_amd64/opt.exe
+          mkdir -p ../src/internal/llvm/toolchain/bin/windows_amd64
+          cp build/bin/llc.exe ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
+          cp build/bin/lld-link.exe ../src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          cp build/bin/opt.exe ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
+          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
+          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
 
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
           $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" | Sort-Object Name -Descending | Select-Object -First 1
           $lib = "$($sdk.FullName)\um\x64\kernel32.lib"
-          cp $lib src/llvm/toolchain/bin/windows_amd64/kernel32.lib
+          cp $lib src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
 
       - name: Write versions
         shell: msys2 {0}
         run: |
-          LLC_VERSION=$(src/llvm/toolchain/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(src/llvm/toolchain/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$(src/llvm/toolchain/bin/windows_amd64/opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/windows_amd64/versions.json
+          LLC_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLD_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          OPT_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
-          path: src/llvm/toolchain/bin/windows_amd64/
+          path: src/internal/llvm/toolchain/bin/windows_amd64/
 
   commit:
     needs: [fetch-linux-amd64, fetch-darwin-arm64, fetch-windows-amd64]
@@ -190,22 +190,22 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: linux-amd64-tools
-          path: src/llvm/toolchain/bin/linux_amd64/
+          path: src/internal/llvm/toolchain/bin/linux_amd64/
 
       - uses: actions/download-artifact@v6
         with:
           name: darwin-arm64-tools
-          path: src/llvm/toolchain/bin/darwin_arm64/
+          path: src/internal/llvm/toolchain/bin/darwin_arm64/
 
       - uses: actions/download-artifact@v6
         with:
           name: windows-amd64-tools
-          path: src/llvm/toolchain/bin/windows_amd64/
+          path: src/internal/llvm/toolchain/bin/windows_amd64/
 
       - name: Commit binaries
         run: |
           set -e
-          git add src/llvm/toolchain/bin/
+          git add src/internal/llvm/toolchain/bin/
           if git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
             echo "No changes to commit"
           else
