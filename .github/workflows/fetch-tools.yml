@@ -69,7 +69,7 @@ jobs:
           LLD_PREFIX=$(brew --prefix lld)
           LLVM_PREFIX=$(brew --prefix llvm)
           LLC_VERSION=$($LLVM_PREFIX/bin/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$($(LLVM_PREFIX)/bin/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          OPT_VERSION=$($LLVM_PREFIX/bin/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/darwin_arm64/versions.json
 
@@ -164,7 +164,7 @@ jobs:
         run: |
           LLC_VERSION=$(src/llvm/toolchain/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$(src/llvm/toolchain/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$(src/llvm/toolchain/bin/windows_amd64opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          OPT_VERSION=$(src/llvm/toolchain/bin/windows_amd64/opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v6
         with:
