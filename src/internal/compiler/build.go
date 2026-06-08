@@ -12,6 +12,7 @@ import (
 	"github.com/Grizak/Wick/src/internal/llvm/assembler"
 	"github.com/Grizak/Wick/src/internal/llvm/codegen"
 	"github.com/Grizak/Wick/src/internal/llvm/linker"
+	optimizer "github.com/Grizak/Wick/src/internal/llvm/opt"
 	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 	"github.com/Grizak/Wick/src/internal/parser"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
@@ -25,6 +26,7 @@ type BuildOptions struct {
 	Output             string
 	SaveIntermediaries bool
 	Target             string
+	Opt                int
 }
 
 func Build(opts BuildOptions) error {
@@ -98,7 +100,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		go func(input string, index int) {
 			defer wg.Done()
 
-			obj, err := compileFile(input, opts.Output, opts.Target, opts.SaveIntermediaries, index)
+			obj, err := compileFile(input, opts.Output, opts.Target, opts.SaveIntermediaries, index, opts.Opt)
 
 			if err != nil {
 				results <- result{err: err, index: index}
@@ -134,7 +136,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 	return objects, nil
 }
 
-func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx int) (string, error) {
+func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int) (string, error) {
 	content, err := os.ReadFile(input)
 	if err != nil {
 		return "", fmt.Errorf("Failed to read input file %s: %v\n", input, err)
@@ -172,8 +174,15 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 		return "", fmt.Errorf("failed to write LLVM IR to file for %s: %w", input, err)
 	}
 
+	if opt > 0 {
+		if err := optimizer.Optimize(outputFile+".ll", outputFile+".ll", opt); err != nil {
+			return "", err
+		}
+	}
+
 	if err := assembler.Assemble(outputFile+".ll", outputFile+".o", outputPrefix, saveIntermediaries, idx); err != nil {
 		return "", fmt.Errorf("assemble failed for %s: %w", input, err)
 	}
+
 	return outputFile + ".o", nil
 }
