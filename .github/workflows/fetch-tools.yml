@@ -66,12 +66,8 @@ jobs:
 
       - name: Write versions
         run: |
-          LLD_PREFIX=$(brew --prefix lld)
-          LLVM_PREFIX=$(brew --prefix llvm)
-          LLC_VERSION=$($LLVM_PREFIX/bin/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$($LLVM_PREFIX/bin/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/darwin_arm64/versions.json
+          LLVM_VERSION=$($LLVM_PREFIX/bin/llvm-config --version)
+          echo "{\"llc\":\"$LLVM_VERSION\",\"lld\":\"$LLVM_VERSION\",\"opt\":\"$LLVM_VERSION\"}" > src/internal/llvm/toolchain/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
