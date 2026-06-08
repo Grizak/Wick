@@ -37,6 +37,7 @@ func Init() error {
 		{LlcCacheDir(), LlcBinaryName(), llcBinary},
 		{LldCacheDir(), LldBinaryName(), lldBinary},
 		{LldCacheDir(), "kernel32.lib", kernel32Lib},
+		{OptCacheDir(), OptBinaryName(), optBinary},
 	} {
 		path := filepath.Join(b.dir, b.name)
 		if _, err := os.Stat(path); err == nil {
@@ -60,12 +61,20 @@ func LlcCacheDir() string {
 	return filepath.Join(tmpDir, "llc-"+versions["llc"])
 }
 
+func OptCacheDir() string {
+	return filepath.Join(tmpDir, "opt-"+versions["opt"])
+}
+
 func LldPath() string {
 	return filepath.Join(LldCacheDir(), LldBinaryName())
 }
 
 func LlcPath() string {
 	return filepath.Join(LlcCacheDir(), LlcBinaryName())
+}
+
+func OptPath() string {
+	return filepath.Join(OptCacheDir(), OptBinaryName())
 }
 
 func LldBinaryName() string {
@@ -84,6 +93,13 @@ func LlcBinaryName() string {
 		return "llc.exe"
 	}
 	return "llc"
+}
+
+func OptBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "opt.exe"
+	}
+	return "opt"
 }
 
 func ExecuteCommand(name string, args ...string) error {
