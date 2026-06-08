@@ -14,12 +14,14 @@ jobs:
       - name: Cleanup
         run: rm -rf src/llvm/toolchain/bin/linux_amd64
 
-      - name: Download LLC
+      - name: Download LLC && opt
         run: |
           mkdir -p src/llvm/toolchain/bin/linux_amd64
           sudo apt-get install -y llvm
           cp $(which llc) src/llvm/toolchain/bin/linux_amd64/llc
+          cp $(which opt) src/llvm/toolchain/bin/linux_amd64/opt
           chmod +x src/llvm/toolchain/bin/linux_amd64/llc
+          chmod +x src/llvm/toolchain/bin/linux_amd64/opt
 
       - name: Download LLD
         run: |
@@ -31,7 +33,8 @@ jobs:
         run: |
           LLC_VERSION=$(llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$(ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/llvm/toolchain/bin/linux_amd64/versions.json
+          OPT_VERSION=$(opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/linux_amd64/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
@@ -46,12 +49,14 @@ jobs:
       - name: Cleanup
         run: rm -rf src/llvm/toolchain/bin/darwin_arm64
 
-      - name: Download LLC
+      - name: Download LLC & opt
         run: |
           mkdir -p src/llvm/toolchain/bin/darwin_arm64
           brew install llvm
           cp $(brew --prefix llvm)/bin/llc src/llvm/toolchain/bin/darwin_arm64/llc
+          cp $(brew --prefix llvm)/bin/opt src/llvm/toolchain/bin/darwin_arm64/opt
           chmod +x src/llvm/toolchain/bin/darwin_arm64/llc
+          chmod +x src/llvm/toolchain/bin/darwin_arm64/opt
 
       - name: Download LLD
         run: |
@@ -64,8 +69,9 @@ jobs:
           LLD_PREFIX=$(brew --prefix lld)
           LLVM_PREFIX=$(brew --prefix llvm)
           LLC_VERSION=$($LLVM_PREFIX/bin/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          OPT_VERSION=$($(LLVM_PREFIX)/bin/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$($LLD_PREFIX/bin/ld64.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/llvm/toolchain/bin/darwin_arm64/versions.json
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/darwin_arm64/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
@@ -137,12 +143,14 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc lld
+          ninja -C build llc lld opt
           mkdir -p ../src/llvm/toolchain/bin/windows_amd64
           cp build/bin/llc.exe ../src/llvm/toolchain/bin/windows_amd64/llc.exe
           cp build/bin/lld-link.exe ../src/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          cp build/bin/opt.exe ../src/llvm/toolchain/bin/windows_amd64/opt.exe
           chmod +x ../src/llvm/toolchain/bin/windows_amd64/llc.exe
           chmod +x ../src/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          chmod +x ../src/llvm/toolchain/bin/windows_amd64/opt.exe
 
       - name: Copy kernel32.lib
         shell: pwsh
@@ -156,7 +164,8 @@ jobs:
         run: |
           LLC_VERSION=$(src/llvm/toolchain/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
           LLD_VERSION=$(src/llvm/toolchain/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\"}" > src/llvm/toolchain/bin/windows_amd64/versions.json
+          OPT_VERSION=$(src/llvm/toolchain/bin/windows_amd64opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/llvm/toolchain/bin/windows_amd64/versions.json
       - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
