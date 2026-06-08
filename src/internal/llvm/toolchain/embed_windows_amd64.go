@@ -15,3 +15,6 @@ var kernel32Lib []byte
 
 //go:embed bin/windows_amd64/versions.json
 var versionsJSON []byte
+
+//go:embed bin/windows_amd64/opt.exe
+var optBinary []byte

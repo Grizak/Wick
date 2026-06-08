@@ -28,6 +28,7 @@ var buildCmd = &cobra.Command{
 				Output:             viper.GetString("output"),
 				SaveIntermediaries: viper.GetBool("save-intermediaries"),
 				Target:             target,
+				Opt:                viper.GetInt("optimisation"),
 			},
 		)
 	},
