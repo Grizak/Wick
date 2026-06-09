@@ -93,7 +93,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static"
           ninja -C build llc opt lld
 
-      - name: Build llc, opt, and ld64.lld (macOS)
+      - name: Build llc, opt, and lld (macOS)
         if: runner.os == 'macOS'
         run: |
           cd llvm-project
@@ -110,7 +110,7 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc opt ld64.lld
+          ninja -C build llc opt lld
 
       - name: Verify macOS binaries
         if: runner.os == 'macOS'
