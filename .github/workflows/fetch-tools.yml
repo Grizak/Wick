@@ -18,7 +18,7 @@ jobs:
             platform: linux_amd64
             lld_binary: ld.lld
             artifact_name: linux-amd64-tools
-          - os: macos-latest
+          - os: macos-15
             platform: darwin_arm64
             lld_binary: ld64.lld
             artifact_name: darwin-arm64-tools
@@ -42,10 +42,14 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         run: |
-          LLVM_VERSION=$(curl -s https://api.github.com/repos/llvm/llvm-project/releases/latest \
-            | grep -oE '"tag_name": "llvmorg-[^"]+' \
-            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' \
-            | head -1)
+          LLVM_VERSION=$(
+            git ls-remote --tags --refs https://github.com/llvm/llvm-project.git \
+              | sed 's|.*refs/tags/llvmorg-||' \
+              | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?$' \
+              | sort -V \
+              | tail -1
+          )
+
           echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
 
       - name: Cache LLVM source
@@ -55,11 +59,15 @@ jobs:
           path: llvm-project
           key: llvm-source-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
 
-      - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
+      - name: Re-clone if cache is invalid
         run: |
-          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
-            https://github.com/llvm/llvm-project.git
+          if [ ! -f llvm-project/llvm/CMakeLists.txt ]; then
+            rm -rf llvm-project
+
+            git clone --depth 1 \
+              --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+              https://github.com/llvm/llvm-project.git
+          fi
 
       - name: Cache LLVM build
         id: cache-llvm-build
@@ -85,7 +93,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static"
           ninja -C build llc opt lld
 
-      - name: Build llc, opt, and lld (macOS)
+      - name: Build llc, opt, and ld64.lld (macOS)
         if: runner.os == 'macOS'
         run: |
           cd llvm-project
@@ -102,7 +110,14 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc opt lld
+          ninja -C build llc opt ld64.lld
+
+      - name: Verify macOS binaries
+        if: runner.os == 'macOS'
+        run: |
+          test -f llvm-project/build/bin/llc
+          test -f llvm-project/build/bin/opt
+          test -f llvm-project/build/bin/ld64.lld
 
       - name: Prepare binaries
         run: |
