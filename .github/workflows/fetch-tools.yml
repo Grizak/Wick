@@ -82,7 +82,7 @@ jobs:
           cd llvm-project
           cmake -S llvm -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DLLVM_BUILD_STATIC=ON \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS="lld" \
@@ -103,7 +103,7 @@ jobs:
           # still statically links LLVM's own internals.
           cmake -S llvm -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS="lld" \
             -DBUILD_SHARED_LIBS=OFF \
@@ -127,6 +127,20 @@ jobs:
           cp llvm-project/build/bin/${{ matrix.lld_binary }} \
              src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
           chmod +x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/*
+
+      - name: Strip binaries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
+          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
+          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+
+      - name: Strip binaries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
+          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
+          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
 
       - name: Write versions
         run: |
@@ -196,7 +210,7 @@ jobs:
           cd llvm-project
           cmake -S llvm -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_ASM_COMPILER=clang \
@@ -221,6 +235,13 @@ jobs:
             Select-Object -First 1
           $lib = "$($sdk.FullName)\um\x64\kernel32.lib"
           cp $lib src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
+
+      - name: Strip binaries (Windows)
+        shell: msys2 {0}
+        run: |
+          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
+          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
+          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
 
       - name: Write versions
         shell: msys2 {0}
