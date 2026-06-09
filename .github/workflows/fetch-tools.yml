@@ -5,19 +5,47 @@ on:
   schedule:
     - cron: "0 0 * * 1,4"
 
+concurrency:
+  group: fetch-tools
+  cancel-in-progress: true
+
 jobs:
-  fetch-linux-amd64:
-    runs-on: ubuntu-latest
+  fetch-unix:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux_amd64
+            lld_binary: ld.lld
+            artifact_name: linux-amd64-tools
+          - os: macos-latest
+            platform: darwin_arm64
+            lld_binary: ld64.lld
+            artifact_name: darwin-arm64-tools
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: rm -rf src/internal/llvm/toolchain/bin/linux_amd64
+        run: rm -rf src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc g++ zlib1g-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja cmake
 
       - name: Get LLVM version
         id: llvm-version
         run: |
-          LLVM_VERSION=$(curl -s https://api.github.com/repos/llvm/llvm-project/releases/latest | grep -oE '"tag_name": "llvmorg-[^"]+' | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+          LLVM_VERSION=$(curl -s https://api.github.com/repos/llvm/llvm-project/releases/latest \
+            | grep -oE '"tag_name": "llvmorg-[^"]+' \
+            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' \
+            | head -1)
           echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
 
       - name: Cache LLVM source
@@ -25,26 +53,23 @@ jobs:
         uses: actions/cache@v4
         with:
           path: llvm-project
-          key: llvm-source-linux-${{ steps.llvm-version.outputs.version }}
+          key: llvm-source-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
 
       - name: Clone LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
-          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} https://github.com/llvm/llvm-project.git
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build gcc g++ zlib1g-dev
+          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+            https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
         uses: actions/cache@v4
         with:
           path: llvm-project/build
-          key: llvm-build-linux-amd64-${{ steps.llvm-version.outputs.version }}
+          key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
 
-      - name: Build llc, opt, and lld statically
+      - name: Build llc, opt, and lld (Linux)
+        if: runner.os == 'Linux'
         run: |
           cd llvm-project
           cmake -S llvm -B build \
@@ -60,78 +85,14 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static"
           ninja -C build llc opt lld
 
-      - name: Prepare binaries
-        run: |
-          mkdir -p src/internal/llvm/toolchain/bin/linux_amd64
-          cp llvm-project/build/bin/llc src/internal/llvm/toolchain/bin/linux_amd64/llc
-          cp llvm-project/build/bin/opt src/internal/llvm/toolchain/bin/linux_amd64/opt
-          cp llvm-project/build/bin/ld.lld src/internal/llvm/toolchain/bin/linux_amd64/ld.lld
-          chmod +x src/internal/llvm/toolchain/bin/linux_amd64/*
-
-      - name: Write versions
-        run: |
-          LLC_VERSION=$(src/internal/llvm/toolchain/bin/linux_amd64/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(src/internal/llvm/toolchain/bin/linux_amd64/ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$(src/internal/llvm/toolchain/bin/linux_amd64/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/linux_amd64/versions.json
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: linux-amd64-tools
-          path: src/internal/llvm/toolchain/bin/linux_amd64/
-
-  fetch-darwin-arm64:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Cleanup
-        run: rm -rf src/internal/llvm/toolchain/bin/darwin_arm64
-
-      - name: Get LLVM version
-        id: llvm-version
-        run: |
-          set -e
-          # Fetch latest release info
-          RELEASE=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/llvm/llvm-project/releases/latest)
-          
-          # Extract tag name (e.g., llvmorg-18.1.8)
-          TAG=$(echo "$RELEASE" | grep -o '"tag_name":"[^"]*' | cut -d'"' -f4)
-          
-          if [ -z "$TAG" ]; then
-            echo "Error: Could not fetch latest LLVM release tag"
-            exit 1
-          fi
-          
-          # Extract version (remove llvmorg- prefix)
-          VERSION=${TAG#llvmorg-}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Detected LLVM version: $VERSION (tag: $TAG)"
-
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v4
-        with:
-          path: llvm-project
-          key: llvm-source-darwin-${{ steps.llvm-version.outputs.version }}
-
-      - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} https://github.com/llvm/llvm-project.git
-
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v4
-        with:
-          path: llvm-project/build
-          key: llvm-build-darwin-arm64-${{ steps.llvm-version.outputs.version }}
-
-      - name: Build llc, opt, and lld statically
+      - name: Build llc, opt, and lld (macOS)
+        if: runner.os == 'macOS'
         run: |
           cd llvm-project
+          # -DCMAKE_EXE_LINKER_FLAGS="-static" is intentionally omitted:
+          # Apple does not ship static versions of system libraries, so
+          # requesting a fully static link fails on Darwin. LLVM_BUILD_STATIC
+          # still statically links LLVM's own internals.
           cmake -S llvm -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -141,29 +102,31 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF \
-            -DCMAKE_EXE_LINKER_FLAGS="-static"
+            -DLLVM_ENABLE_ZSTD=OFF
           ninja -C build llc opt lld
 
       - name: Prepare binaries
         run: |
-          mkdir -p src/internal/llvm/toolchain/bin/darwin_arm64
-          cp llvm-project/build/bin/llc src/internal/llvm/toolchain/bin/darwin_arm64/llc
-          cp llvm-project/build/bin/opt src/internal/llvm/toolchain/bin/darwin_arm64/opt
-          cp llvm-project/build/bin/ld.lld src/internal/llvm/toolchain/bin/darwin_arm64/ld.lld
-          chmod +x src/internal/llvm/toolchain/bin/darwin_arm64/*
+          mkdir -p src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+          cp llvm-project/build/bin/llc  src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
+          cp llvm-project/build/bin/opt  src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
+          cp llvm-project/build/bin/${{ matrix.lld_binary }} \
+             src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+          chmod +x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/*
 
       - name: Write versions
         run: |
-          LLC_VERSION=$(src/internal/llvm/toolchain/bin/darwin_arm64/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(src/internal/llvm/toolchain/bin/darwin_arm64/ld.lld --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$(src/internal/llvm/toolchain/bin/darwin_arm64/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/darwin_arm64/versions.json
+          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+          LLC_VERSION=$($BIN/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          LLD_VERSION=$($BIN/${{ matrix.lld_binary }} --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          OPT_VERSION=$($BIN/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" \
+            > $BIN/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
-          name: darwin-arm64-tools
-          path: src/internal/llvm/toolchain/bin/darwin_arm64/
+          name: ${{ matrix.artifact_name }}
+          path: src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
 
   fetch-windows-amd64:
     runs-on: windows-latest
@@ -173,7 +136,7 @@ jobs:
       - name: Cleanup
         run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/internal/llvm/toolchain/bin/windows_amd64
 
-      - name: Setup msys2 and install llvm
+      - name: Setup MSYS2 and install LLVM
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANG64
@@ -189,7 +152,7 @@ jobs:
         id: llvm-version
         shell: msys2 {0}
         run: |
-          LLVM_VERSION=$(llvm-config --version)
+          LLVM_VERSION=$(llvm-config --version | head -1)
           echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
 
       - name: Cache LLVM source
@@ -203,7 +166,8 @@ jobs:
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
-          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} https://github.com/llvm/llvm-project.git
+          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+            https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
@@ -212,7 +176,7 @@ jobs:
           path: llvm-project/build
           key: llvm-build-windows-amd64-${{ steps.llvm-version.outputs.version }}
 
-      - name: Build llc and lld statically
+      - name: Build llc, opt, and lld
         shell: msys2 {0}
         run: |
           cd llvm-project
@@ -231,27 +195,28 @@ jobs:
             -DLLVM_ENABLE_ZSTD=OFF
           ninja -C build llc opt lld
           mkdir -p ../src/internal/llvm/toolchain/bin/windows_amd64
-          cp build/bin/llc.exe ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
+          cp build/bin/llc.exe      ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
           cp build/bin/lld-link.exe ../src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          cp build/bin/opt.exe ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
-          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
-          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          chmod +x ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
+          cp build/bin/opt.exe      ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
 
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
-          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" | Sort-Object Name -Descending | Select-Object -First 1
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
           $lib = "$($sdk.FullName)\um\x64\kernel32.lib"
           cp $lib src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
 
       - name: Write versions
         shell: msys2 {0}
         run: |
-          LLC_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/llc.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          LLD_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          OPT_VERSION=$(src/internal/llvm/toolchain/bin/windows_amd64/opt.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" > src/internal/llvm/toolchain/bin/windows_amd64/versions.json
+          BIN=src/internal/llvm/toolchain/bin/windows_amd64
+          LLC_VERSION=$($BIN/llc.exe --version      | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          LLD_VERSION=$($BIN/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          OPT_VERSION=$($BIN/opt.exe --version      | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" \
+            > $BIN/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
@@ -259,20 +224,21 @@ jobs:
           path: src/internal/llvm/toolchain/bin/windows_amd64/
 
   commit:
-    needs: [fetch-linux-amd64, fetch-darwin-arm64, fetch-windows-amd64]
+    needs: [fetch-unix, fetch-windows-amd64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history needed for the no-ff merge
 
       - name: Setup git
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config pull.rebase false
-          git checkout -b chore/update-tools
+          git checkout -B chore/update-tools  # -B resets the branch if it already exists
 
       - uses: actions/download-artifact@v6
         with:
@@ -289,16 +255,15 @@ jobs:
           name: windows-amd64-tools
           path: src/internal/llvm/toolchain/bin/windows_amd64/
 
-      - name: Commit binaries
+      - name: Commit and push
         run: |
           set -e
           git add src/internal/llvm/toolchain/bin/
-          if git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: update tools"
+          if git diff --staged --quiet; then
+            echo "No changes to commit, skipping push"
+            exit 0
           fi
-
+          git commit -m "chore: update tools"
           git checkout master
           git pull --no-rebase origin master
           git merge --no-ff chore/update-tools
