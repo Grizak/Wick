@@ -8,4 +8,4 @@ if [ -z $RELEASE ]; then
   go build -ldflags "-X main.version=$(git describe --tags --abbrev=0)" -o $TARGET $SOURCES
 else
   go build -ldflags "-X main.version=$(git describe --tags --abbrev=0) -s -w" -o $TARGET $SOURCES
-done
+fi
