@@ -14,9 +14,15 @@ jobs:
       - name: Build
         run: |
           set -e
-          GOARCH=amd64 GOOS=linux make TARGET=wick-linux_amd64-${GITHUB_REF_NAME}
-          GOARCH=amd64 GOOS=windows make TARGET=wick-windows_amd64-${GITHUB_REF_NAME}
-          GOARCH=arm64 GOOS=darwin make TARGET=wick-darwin-arm64-${GITHUB_REF_NAME}
+          make linux TARGET=wick-linux_amd64-${GITHUB_REF_NAME}
+          make win TARGET=wick-windows_amd64-${GITHUB_REF_NAME}
+          make darwin TARGET=wick-darwin-arm64-${GITHUB_REF_NAME}
+
+      - name: Strip binaries
+        run: |
+          set -e
+          strip build/wick-linux_amd64-* build/wick-windows_amd64-*
+          strip -x build/wick-darwin_arm64-*
 
       - uses: actions/upload-artifact@v6
         with:
