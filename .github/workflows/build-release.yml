@@ -11,18 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install llvm
+        run: |
+          set -e
+          apt-get update
+          apt-get install llvm
+
       - name: Build
         run: |
           set -e
-          make linux TARGET=wick-linux_amd64-${GITHUB_REF_NAME}
-          make win TARGET=wick-windows_amd64-${GITHUB_REF_NAME}
-          make darwin TARGET=wick-darwin_arm64-${GITHUB_REF_NAME}
+          make all \
+           DARWIN_TARGET=wick-darwin_arm64-${GITHUB_REF_NAME} \
+           WIN_TARGET=wick-windows_amd64-${GITHUB_REF_NAME} \
+           LINUX_TARGET=wick-linux_amd64-${GITHUB_REF_NAME} 
 
       - name: Strip binaries
         run: |
           set -e
-          strip build/wick-linux_amd64-* build/wick-windows_amd64-*
-          strip -x build/wick-darwin_arm64-*
+          llvm-strip build/wick-*
 
       - uses: actions/upload-artifact@v6
         with:
