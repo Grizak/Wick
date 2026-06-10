@@ -158,30 +158,33 @@ jobs:
 
   fetch-windows-amd64:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: Remove-Item -Recurse -Force -ErrorAction SilentlyContinue src/internal/llvm/toolchain/bin/windows_amd64
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
+            src/internal/llvm/toolchain/bin/windows_amd64
 
-      - name: Setup MSYS2 and install LLVM
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: CLANG64
-          install: >
-            git
-            cmake
-            ninja
-            clang
-            python3
-            llvm
+      - name: Install LLVM
+        shell: pwsh
+        run: |
+          choco install llvm -y
+
+          $llvmBin = "C:\Program Files\LLVM\bin"
+          echo "$llvmBin" >> $env:GITHUB_PATH
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
 
       - name: Get LLVM version
         id: llvm-version
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          LLVM_VERSION=$(llvm-config --version | head -1)
-          echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
+          $version = (& llvm-config --version).Trim()
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Cache LLVM source
         id: cache-llvm
@@ -192,9 +195,11 @@ jobs:
 
       - name: Clone LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          git clone --depth 1 --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+          git clone `
+            --depth 1 `
+            --branch llvmorg-${{ steps.llvm-version.outputs.version }} `
             https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
@@ -205,27 +210,33 @@ jobs:
           key: llvm-build-windows-amd64-${{ steps.llvm-version.outputs.version }}
 
       - name: Build llc, opt, and lld
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          cd llvm-project
-          cmake -S llvm -B build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_ASM_COMPILER=clang \
-            -DLLVM_BUILD_STATIC=ON \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS="lld" \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DLLVM_ENABLE_TERMINFO=OFF \
-            -DLLVM_ENABLE_ZLIB=OFF \
+          cmake `
+            -S llvm-project/llvm `
+            -B llvm-project/build `
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=MinSizeRel `
+            -DCMAKE_C_COMPILER=clang `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_ASM_COMPILER=clang `
+            -DLLVM_BUILD_STATIC=ON `
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
+            -DLLVM_ENABLE_PROJECTS="lld" `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DLLVM_ENABLE_TERMINFO=OFF `
+            -DLLVM_ENABLE_ZLIB=OFF `
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc opt lld
-          mkdir -p ../src/internal/llvm/toolchain/bin/windows_amd64
-          cp build/bin/llc.exe      ../src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
-          cp build/bin/lld-link.exe ../src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          cp build/bin/opt.exe      ../src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
+
+          cmake --build llvm-project/build --target llc opt lld
+
+          $out = "src/internal/llvm/toolchain/bin/windows_amd64"
+
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          Copy-Item llvm-project/build/bin/llc.exe $out
+          Copy-Item llvm-project/build/bin/lld-link.exe $out
+          Copy-Item llvm-project/build/bin/opt.exe $out
 
       - name: Copy kernel32.lib
         shell: pwsh
@@ -233,25 +244,38 @@ jobs:
           $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
             Sort-Object Name -Descending |
             Select-Object -First 1
-          $lib = "$($sdk.FullName)\um\x64\kernel32.lib"
-          cp $lib src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
 
-      - name: Strip binaries (Windows)
-        shell: msys2 {0}
+          Copy-Item `
+            "$($sdk.FullName)\um\x64\kernel32.lib" `
+            src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
+
+      - name: Strip binaries
+        shell: pwsh
         run: |
           llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
           llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
           llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
 
       - name: Write versions
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          BIN=src/internal/llvm/toolchain/bin/windows_amd64
-          LLC_VERSION=$($BIN/llc.exe --version      | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          LLD_VERSION=$($BIN/lld-link.exe --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          OPT_VERSION=$($BIN/opt.exe --version      | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" \
-            > $BIN/versions.json
+          $bin = "src/internal/llvm/toolchain/bin/windows_amd64"
+
+          $llc = (& "$bin\llc.exe" --version |
+            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
+
+          $lld = (& "$bin\lld-link.exe" --version |
+            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
+
+          $opt = (& "$bin\opt.exe" --version |
+            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
+
+          @{
+            llc = $llc
+            lld = $lld
+            opt = $opt
+          } | ConvertTo-Json -Compress |
+            Set-Content "$bin\versions.json"
 
       - uses: actions/upload-artifact@v6
         with:
