@@ -16,7 +16,7 @@ jobs:
           set -e
           make linux TARGET=wick-linux_amd64-${GITHUB_REF_NAME}
           make win TARGET=wick-windows_amd64-${GITHUB_REF_NAME}
-          make darwin TARGET=wick-darwin-arm64-${GITHUB_REF_NAME}
+          make darwin TARGET=wick-darwin_arm64-${GITHUB_REF_NAME}
 
       - name: Strip binaries
         run: |
