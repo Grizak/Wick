@@ -183,7 +183,7 @@ jobs:
         id: llvm-version
         shell: pwsh
         run: |
-          $version = (& llvm-config --version).Trim()
+          $version = (& clang --version)[0] -replace '^clang version ([^ ]+).*','$1'
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Cache LLVM source
