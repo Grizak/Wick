@@ -54,7 +54,7 @@ jobs:
 
       - name: Cache LLVM source
         id: cache-llvm
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: llvm-project
           key: llvm-source-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
@@ -71,7 +71,7 @@ jobs:
 
       - name: Cache LLVM build
         id: cache-llvm-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: llvm-project/build
           key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
@@ -185,7 +185,7 @@ jobs:
 
       - name: Cache LLVM source
         id: cache-llvm
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: llvm-project
           key: llvm-source-windows-${{ steps.llvm-version.outputs.version }}
@@ -199,7 +199,7 @@ jobs:
 
       - name: Cache LLVM build
         id: cache-llvm-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: llvm-project/build
           key: llvm-build-windows-amd64-${{ steps.llvm-version.outputs.version }}
