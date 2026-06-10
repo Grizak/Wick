@@ -16,13 +16,13 @@ current: prepare
 	./build.sh $(TARGET_FULL) $(SOURCES)
 
 win: prepare
-	GOOS=windows GOARCH=amd64 ./build.sh $(WIN_TARGET_FULL) $(SOURCES)
+	GOOS=windows GOARCH=amd64 WICK_RELEASE=yes ./build.sh $(WIN_TARGET_FULL) $(SOURCES)
 
 linux: prepare
-	GOOS=linux GOARCH=amd64 ./build.sh $(LINUX_TARGET_FULL) $(SOURCES)
+	GOOS=linux GOARCH=amd64 WICK_RELEASE=yes ./build.sh $(LINUX_TARGET_FULL) $(SOURCES)
 
 darwin: prepare
-	GOOS=darwin GOARCH=arm64 ./build.sh $(DARWIN_TARGET_FULL) $(SOURCES)
+	GOOS=darwin GOARCH=arm64 WICK_RELEASE=yes ./build.sh $(DARWIN_TARGET_FULL) $(SOURCES)
 
 all: win linux darwin
 	@echo "Done"
