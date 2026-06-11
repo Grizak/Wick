@@ -10,7 +10,7 @@ WIN_TARGET_FULL = $(BUILD_DIR)/$(WIN_TARGET)
 LINUX_TARGET_FULL = $(BUILD_DIR)/$(LINUX_TARGET)
 SOURCES = src/cmd/wick/main.go src/cmd/wick/root.go src/cmd/wick/build.go src/cmd/wick/version.go
 
-.PHONY: current win linux darwin all clean art cp
+.PHONY: current win linux darwin all clean art
 
 current: prepare
 	./build.sh $(TARGET_FULL) $(SOURCES)
@@ -36,5 +36,5 @@ art:
 clean: art
 	rm -rf $(BUILD_DIR) 2>/dev/null
 
-assets: 
+assets:
 	cp LICENSE src/internal/assets/LICENSE
