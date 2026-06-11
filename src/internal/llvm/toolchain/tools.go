@@ -103,10 +103,22 @@ func OptBinaryName() string {
 }
 
 func ExecuteCommand(name string, args ...string) error {
+	println("EXEC:", name)
+	for _, arg := range args {
+		println(" ARG:", arg)
+	}
+
 	c := exec.Command(name, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	return c.Run()
+
+	err := c.Run()
+
+	if err != nil {
+		println("ERR:", err.Error())
+	}
+
+	return err
 }
 
 func cacheDir() (string, error) {
