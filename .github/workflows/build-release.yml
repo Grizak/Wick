@@ -16,7 +16,7 @@ jobs:
           set -e
           make all \
            DARWIN_TARGET=wick-darwin_arm64-${GITHUB_REF_NAME} \
-           WIN_TARGET=wick-windows_amd64-${GITHUB_REF_NAME} \
+           WIN_TARGET=wick-windows_amd64-${GITHUB_REF_NAME}.exe \
            LINUX_TARGET=wick-linux_amd64-${GITHUB_REF_NAME}
 
       - uses: actions/upload-artifact@v6
