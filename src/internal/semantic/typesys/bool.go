@@ -1,5 +1,7 @@
 package typesys
 
+import "github.com/Grizak/Wick/src/internal/types"
+
 // BoolType represents a 1-bit boolean
 type BoolType struct{}
 
@@ -15,7 +17,7 @@ func (t *BoolType) SizeBytes() int {
 	return 1
 }
 
-func (t *BoolType) Equals(other Type) bool {
+func (t *BoolType) Equals(other types.Type) bool {
 	_, ok := other.(*BoolType)
 	return ok
 }

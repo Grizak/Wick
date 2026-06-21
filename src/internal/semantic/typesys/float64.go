@@ -1,5 +1,7 @@
 package typesys
 
+import "github.com/Grizak/Wick/src/internal/types"
+
 // FloatType represents a 64-bit floating point
 type FloatType struct{}
 
@@ -15,7 +17,7 @@ func (t *FloatType) SizeBytes() int {
 	return 8
 }
 
-func (t *FloatType) Equals(other Type) bool {
+func (t *FloatType) Equals(other types.Type) bool {
 	_, ok := other.(*FloatType)
 	return ok
 }

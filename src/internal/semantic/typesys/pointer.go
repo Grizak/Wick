@@ -1,10 +1,14 @@
 package typesys
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Grizak/Wick/src/internal/types"
+)
 
 // PointerType represents a pointer to another type
 type PointerType struct {
-	PointsTo Type
+	PointsTo types.Type
 }
 
 func (t *PointerType) Name() string {
@@ -19,7 +23,7 @@ func (t *PointerType) SizeBytes() int {
 	return 8
 }
 
-func (t *PointerType) Equals(other Type) bool {
+func (t *PointerType) Equals(other types.Type) bool {
 	if ptr, ok := other.(*PointerType); ok {
 		return t.PointsTo.Equals(ptr.PointsTo)
 	}

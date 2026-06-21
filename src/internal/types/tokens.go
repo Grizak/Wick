@@ -38,6 +38,8 @@ const (
 	TokenSemicolon    TokenType = ";"
 	TokenBreak        TokenType = "break"
 	TokenContinue     TokenType = "continue"
+	TokenFunctionDecl TokenType = "fn"
+	TokenReturnStmt   TokenType = "return"
 )
 
 type Token struct {
