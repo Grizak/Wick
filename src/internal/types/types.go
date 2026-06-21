@@ -19,3 +19,11 @@ type LexerResult struct {
 	Token Token
 	Err   *CompileError
 }
+
+// Type represents all possible types in Wick
+type Type interface {
+	Name() string
+	LLVMType() string
+	SizeBytes() int
+	Equals(other Type) bool
+}
