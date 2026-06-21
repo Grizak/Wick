@@ -1,5 +1,7 @@
 package typesys
 
+import "github.com/Grizak/Wick/src/internal/types"
+
 // Int32Type represents a 32-bit signed integer
 type Int32Type struct{}
 
@@ -15,7 +17,7 @@ func (t *Int32Type) SizeBytes() int {
 	return 4
 }
 
-func (t *Int32Type) Equals(other Type) bool {
+func (t *Int32Type) Equals(other types.Type) bool {
 	_, ok := other.(*Int32Type)
 	return ok
 }

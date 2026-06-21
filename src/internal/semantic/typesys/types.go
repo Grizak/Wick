@@ -8,31 +8,23 @@ import (
 	"github.com/Grizak/Wick/src/internal/types"
 )
 
-// Type represents all possible types in Wick
-type Type interface {
-	Name() string
-	LLVMType() string
-	SizeBytes() int
-	Equals(other Type) bool
-}
-
 // TypeEnvironment tracks variable types
 type TypeEnvironment struct {
-	vars   map[string]Type
+	vars   map[string]types.Type
 	parent *TypeEnvironment
 }
 
 func NewTypeEnvironment() *TypeEnvironment {
 	return &TypeEnvironment{
-		vars: make(map[string]Type),
+		vars: make(map[string]types.Type),
 	}
 }
 
-func (env *TypeEnvironment) Define(name string, typ Type) {
+func (env *TypeEnvironment) Define(name string, typ types.Type) {
 	env.vars[name] = typ
 }
 
-func (env *TypeEnvironment) Lookup(name string) (Type, bool) {
+func (env *TypeEnvironment) Lookup(name string) (types.Type, bool) {
 	if typ, exists := env.vars[name]; exists {
 		return typ, true
 	}
@@ -44,7 +36,7 @@ func (env *TypeEnvironment) Lookup(name string) (Type, bool) {
 
 func (env *TypeEnvironment) Child() *TypeEnvironment {
 	return &TypeEnvironment{
-		vars:   make(map[string]Type),
+		vars:   make(map[string]types.Type),
 		parent: env,
 	}
 }
@@ -57,9 +49,10 @@ type TypeChecker struct {
 
 }
 
-func NewTypeChecker() *TypeChecker {
+func NewTypeChecker(filename string) *TypeChecker {
 	return &TypeChecker{
-		env: NewTypeEnvironment(),
+		filename: filename,
+		env:      NewTypeEnvironment(),
 	}
 }
 
@@ -158,44 +151,11 @@ func (tc *TypeChecker) CheckVarAssign(assign *ast.NodeVarAssign) error {
 	return nil
 }
 
-func (tc *TypeChecker) CheckExpression(expr ast.NodeExpression) (Type, error) {
-	if expr.IntLit != nil {
-		return &Int64Type{}, nil
-	}
-	if expr.FloatLit != nil {
-		return &FloatType{}, nil
-	}
-	if expr.BoolLit != nil {
-		return &BoolType{}, nil
-	}
-	if expr.StringLit != nil {
-		return &StringType{}, nil
-	}
-	if expr.Ident != nil {
-		typ, exists := tc.env.Lookup(*expr.Ident)
-		if !exists {
-			return nil, tc.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), &expr.Pos)
-		}
-		return typ, nil
-	}
-	if expr.FuncCall != nil {
-		return tc.CheckFunctionCall(expr.FuncCall)
-	}
-	if expr.BinExpr != nil {
-		leftType, err := tc.CheckExpression(expr.BinExpr.Left)
-		if err != nil {
-			return nil, err
-		}
-		rightType, err := tc.CheckExpression(expr.BinExpr.Right)
-		if err != nil {
-			return nil, err
-		}
-		return tc.CheckBinaryOp(expr.BinExpr, leftType, rightType)
-	}
-	return nil, tc.error("unknown expression type", &expr.Pos)
+func (tc *TypeChecker) CheckExpression(expr ast.NodeExpression) (types.Type, error) {
+	return tc.InferType(&expr)
 }
 
-func (tc *TypeChecker) CheckBinaryOp(expr *ast.NodeBinExpr, left, right Type) (Type, error) {
+func (tc *TypeChecker) CheckBinaryOp(expr *ast.NodeBinExpr, left, right types.Type) (types.Type, error) {
 	// Arithmetic operators
 	if expr.Op == "+" || expr.Op == "-" || expr.Op == "*" || expr.Op == "/" {
 		if !isNumeric(left) || !isNumeric(right) {
@@ -234,7 +194,7 @@ func (tc *TypeChecker) CheckBinaryOp(expr *ast.NodeBinExpr, left, right Type) (T
 	return nil, tc.error(fmt.Sprintf("unknown operator: %s", expr.Op), &expr.Pos)
 }
 
-func isNumeric(t Type) bool {
+func isNumeric(t types.Type) bool {
 	switch t.(type) {
 	case *Int64Type, *Int32Type, *FloatType:
 		return true
@@ -242,12 +202,12 @@ func isNumeric(t Type) bool {
 	return false
 }
 
-func isFloat(t Type) bool {
+func isFloat(t types.Type) bool {
 	_, ok := t.(*FloatType)
 	return ok
 }
 
-func isBool(t Type) bool {
+func isBool(t types.Type) bool {
 	_, ok := t.(*BoolType)
 	return ok
 }
@@ -260,7 +220,7 @@ func (tc *TypeChecker) error(msg string, pos *types.Position) *types.CompileErro
 	}
 }
 
-func (tc *TypeChecker) InferType(expr *ast.NodeExpression) (Type, error) {
+func (tc *TypeChecker) InferType(expr *ast.NodeExpression) (types.Type, error) {
 	if expr.IntLit != nil {
 		return &Int64Type{}, nil
 	}
@@ -280,6 +240,60 @@ func (tc *TypeChecker) InferType(expr *ast.NodeExpression) (Type, error) {
 		}
 		return typ, nil
 	}
+	if expr.FuncDecl != nil {
+		paramTypes := make([]types.Type, len(expr.FuncDecl.Params))
+		defaults := make([]*ast.NodeExpression, len(expr.FuncDecl.Params))
+		seenDefault := false
+
+		for i, p := range expr.FuncDecl.Params {
+			if p.Default == nil {
+				if seenDefault {
+					return nil, tc.error(fmt.Sprintf(
+						"parameter '%s' without a default cannot follow a defaulted parameter", p.Name), &p.Pos)
+				}
+				if p.Type == nil {
+					return nil, tc.error(fmt.Sprintf(
+						"parameter '%s' requires an explicit type or a default value", p.Name), &p.Pos)
+				}
+				t, err := tc.ParseTypeString(*p.Type)
+				if err != nil {
+					return nil, err
+				}
+				paramTypes[i] = t
+				continue
+			}
+
+			seenDefault = true
+			defaultType, err := tc.InferType(p.Default)
+			if err != nil {
+				return nil, err
+			}
+			if p.Type != nil {
+				declaredType, err := tc.ParseTypeString(*p.Type)
+				if err != nil {
+					return nil, err
+				}
+				if !declaredType.Equals(defaultType) && !TryCoerce(defaultType, declaredType) {
+					return nil, tc.error(fmt.Sprintf(
+						"parameter '%s': default value type %s does not match declared type %s",
+						p.Name, defaultType.Name(), declaredType.Name()), &p.Pos)
+				}
+				paramTypes[i] = declaredType
+			} else {
+				paramTypes[i] = defaultType // e.g. `a = 5` infers i64 from the literal
+			}
+			defaults[i] = p.Default
+		}
+
+		if expr.FuncDecl.ReturnType == nil {
+			return nil, fmt.Errorf("function literal requires an explicit return type")
+		}
+		retType, err := tc.ParseTypeString(*expr.FuncDecl.ReturnType)
+		if err != nil {
+			return nil, err
+		}
+		return &FunctionType{ParamTypes: paramTypes, ReturnType: retType, Defaults: defaults}, nil
+	}
 	if expr.FuncCall != nil {
 		return tc.CheckFunctionCall(expr.FuncCall)
 	}
@@ -297,7 +311,7 @@ func (tc *TypeChecker) InferType(expr *ast.NodeExpression) (Type, error) {
 	return nil, tc.error("unknown expression type", &expr.Pos)
 }
 
-func TryCoerce(from, to Type) bool {
+func TryCoerce(from, to types.Type) bool {
 	if from.Equals(to) {
 		return true
 	}
@@ -310,7 +324,7 @@ func TryCoerce(from, to Type) bool {
 
 // ParseTypeString converts a type annotation string into a Type object
 // Supports: i32, i64, f64, bool, string, int, float, *Type, [N]Type
-func (tc *TypeChecker) ParseTypeString(typeStr string) (Type, error) {
+func (tc *TypeChecker) ParseTypeString(typeStr string) (types.Type, error) {
 	// Handle pointer types
 	if len(typeStr) > 0 && typeStr[0] == '*' {
 		innerType, err := tc.ParseTypeString(typeStr[1:])
@@ -365,7 +379,7 @@ func (tc *TypeChecker) ParseTypeString(typeStr string) (Type, error) {
 }
 
 // CheckFunctionCall validates a function call and returns the return type
-func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (Type, error) {
+func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (types.Type, error) {
 	// Look up the function type
 	fnType, exists := tc.env.Lookup(call.Name)
 	if !exists {
@@ -379,9 +393,10 @@ func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (Type, error) {
 	}
 
 	// Check argument count
-	if len(call.Args) != len(fn.ParamTypes) {
-		return nil, tc.error(fmt.Sprintf("function %s expects %d arguments, got %d",
-			call.Name, len(fn.ParamTypes), len(call.Args)), &call.Pos)
+	required := fn.RequiredArgCount()
+	if len(call.Args) < required || len(call.Args) > len(fn.ParamTypes) {
+		return nil, tc.error(fmt.Sprintf("function %s expects %d to %d arguments, got %d",
+			call.Name, required, len(fn.ParamTypes), len(call.Args)), &call.Pos)
 	}
 
 	// Check each argument type
