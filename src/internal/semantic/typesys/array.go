@@ -1,10 +1,14 @@
 package typesys
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Grizak/Wick/src/internal/types"
+)
 
 // ArrayType represents a fixed-size array
 type ArrayType struct {
-	ElementType Type
+	ElementType types.Type
 	Length      int
 }
 
@@ -20,7 +24,7 @@ func (t *ArrayType) SizeBytes() int {
 	return t.Length * t.ElementType.SizeBytes()
 }
 
-func (t *ArrayType) Equals(other Type) bool {
+func (t *ArrayType) Equals(other types.Type) bool {
 	if arr, ok := other.(*ArrayType); ok {
 		return t.Length == arr.Length && t.ElementType.Equals(arr.ElementType)
 	}

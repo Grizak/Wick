@@ -1,0 +1,9 @@
+fn add(a=5, b=10): i64 {
+  return a+b
+}
+
+let first = add(6,7) // 13
+let second = add(6) // 16
+let third = add() // 15
+
+exit(first+second+third) // 13 + 16 + 15 = 44
