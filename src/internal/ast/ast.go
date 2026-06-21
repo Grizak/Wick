@@ -1,6 +1,8 @@
 package ast
 
-import "github.com/Grizak/Wick/src/internal/types"
+import (
+	"github.com/Grizak/Wick/src/internal/types"
+)
 
 type NodeProgram struct {
 	Statements []NodeStatement
@@ -16,6 +18,7 @@ type NodeStatement struct {
 	For       *NodeFor
 	Break     *NodeBreak
 	Continue  *NodeContinue
+	Return    *NodeReturn
 }
 
 type NodeExit struct {
@@ -26,6 +29,7 @@ type NodeExit struct {
 type NodeExpression struct {
 	BinExpr   *NodeBinExpr
 	FuncCall  *NodeFuncCall
+	FuncDecl  *NodeFuncDecl
 	IntLit    *int
 	FloatLit  *float64
 	BoolLit   *bool
@@ -87,4 +91,24 @@ type NodeBreak struct {
 
 type NodeContinue struct {
 	Pos types.Position
+}
+
+type NodeFuncDecl struct {
+	Params     []NodeParam
+	Body       NodeBlock
+	Pos        types.Position
+	ReturnType *string
+}
+
+type NodeReturn struct {
+	Expr *NodeExpression // nil for bare return in void function
+	Pos  types.Position
+}
+
+type NodeParam struct {
+	Name    string
+	Type    *string         // nil if inferred from Default
+	Default *NodeExpression // nil = required, no default
+	Const   bool
+	Pos     types.Position
 }

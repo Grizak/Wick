@@ -39,6 +39,8 @@ var keywords = map[string]types.TokenType{
 	"for":      types.TokenFor,
 	"break":    types.TokenBreak,
 	"continue": types.TokenContinue,
+	"fn":       types.TokenFunctionDecl,
+	"return":   types.TokenReturnStmt,
 }
 
 type Lexer struct {
