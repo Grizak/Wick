@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 				Output:             viper.GetString("output"),
 				SaveIntermediaries: viper.GetBool("save-intermediaries"),
 				Target:             target,
-				Opt:                viper.GetInt("optimisation"),
+				Opt:                viper.GetInt("optimization"),
 			},
 		)
 	},
@@ -51,12 +51,12 @@ func init() {
 	flags.StringP("output", "o", "dist/out", "Output file")
 	flags.BoolP("save-intermediaries", "s", false, "Save intermediary files")
 	flags.StringP("target", "t", "", "Compilation target (default: same as host, can also be set via WICK_TARGET environment variable)")
-	flags.IntP("optimisation", "O", 0, "Optimization level (0-3)")
+	flags.IntP("optimization", "O", 0, "Optimization level (0-3)")
 
 	viper.BindPFlag("output", flags.Lookup("output"))
 	viper.BindPFlag("save-intermediaries", flags.Lookup("save-intermediaries"))
 	viper.BindPFlag("target", flags.Lookup("target"))
-	viper.BindPFlag("optimisation", flags.Lookup("optimisation"))
+	viper.BindPFlag("optimization", flags.Lookup("optimization"))
 
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
 }
