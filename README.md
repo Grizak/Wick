@@ -2,6 +2,8 @@
 
 A compiled, statically typed programming language with a clean, Python-inspired syntax that compiles to native executables via LLVM IR.
 
+This project is actively maintained by me (Grizak) on my [youtube channel](https://youtube.com/@grizakbuilds), in this [playlist](https://youtube.com/playlist?list=PLRaVNasWvQcM&si=FHzRNCJZUOAJe5i4)
+
 ## Features
 
 - Clean, minimal syntax
@@ -137,9 +139,8 @@ The compiler binary will be at `build/wick`.
 
 ## Roadmap
 
-- [ ] Functions
 - [ ] Built-in functions (`print`, etc.)
-- [ ] More types (`bool`, `float`, `string`)
+- [ ] More types (`bool`, `string`)
 - [ ] Arrays
 - [ ] Pointers
 
