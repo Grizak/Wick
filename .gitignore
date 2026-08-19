@@ -2,3 +2,5 @@ build
 .vscode
 dist
 project.zip
+
+notes/*
