@@ -18,7 +18,7 @@ import (
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
 	"github.com/Grizak/Wick/src/internal/target"
 	"github.com/Grizak/Wick/src/internal/types"
-	"github.com/mohae/randchars"
+	"tinygo.org/x/go-llvm"
 )
 
 type BuildOptions struct {
@@ -31,6 +31,10 @@ type BuildOptions struct {
 
 func Build(opts BuildOptions) error {
 	if err := prepareOutputDir(opts.Output); err != nil {
+		return err
+	}
+
+	if err := prepareLLVM(); err != nil {
 		return err
 	}
 
@@ -64,6 +68,14 @@ func validateTarget(host, target string) error {
 	return nil
 }
 
+func prepareLLVM() error {
+	llvm.InitializeAllTargets()
+	llvm.InitializeAllTargetMCs()
+	llvm.InitializeAllAsmPrinters()
+	llvm.InitializeAllAsmParsers()
+	return nil
+}
+
 func prepareOutputDir(output string) error {
 	outDir := filepath.Dir(output)
 	if _, err := os.Stat(outDir); os.IsNotExist(err) {
@@ -92,6 +104,26 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		err        error
 	}
 
+	context := llvm.NewContext()
+	defer context.Dispose()
+
+	targetTriple := target.TargetTriples[opts.Target]
+
+	target, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		return objects, err
+	}
+
+	targetMachine := target.CreateTargetMachine(
+		targetTriple, // Triple
+		"generic",    // CPU
+		"",           // Features
+		llvm.CodeGenLevelDefault,
+		llvm.RelocDefault,
+		llvm.CodeModelDefault,
+	)
+	defer targetMachine.Dispose()
+
 	results := make(chan result, len(opts.Input))
 	var wg sync.WaitGroup
 
@@ -100,7 +132,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		go func(input string, index int) {
 			defer wg.Done()
 
-			obj, err := compileFile(input, opts.Output, opts.Target, opts.SaveIntermediaries, index, opts.Opt)
+			obj, err := compileFile(input, opts.Output, targetTriple, opts.SaveIntermediaries, index, opts.Opt, context, targetMachine)
 
 			if err != nil {
 				results <- result{err: err, index: index}
@@ -136,7 +168,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 	return objects, nil
 }
 
-func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int) (string, error) {
+func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int, context llvm.Context, targetMachine llvm.TargetMachine) (string, error) {
 	content, err := os.ReadFile(input)
 	if err != nil {
 		return "", fmt.Errorf("Failed to read input file %s: %v\n", input, err)
@@ -157,32 +189,35 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 		return "", err
 	}
 
-	outputFile := outputPrefix + "_" + string(randchars.LowerAlpha(8))
-
 	generator := codegen.NewGenerator(&program, input)
-	targetTriple, ok := target.TargetTriples[targetTriple]
-	if !ok {
-		return "", fmt.Errorf("unsupported target: %s", targetTriple)
-	}
-	ir, err := generator.Generate(targetTriple)
 
+	mod := context.NewModule(input)
+	defer mod.Dispose()
+
+	target, err := target.NewTarget(targetTriple)
+	if err != nil {
+		return "", fmt.Errorf("failed to create target for %s: %w", input, err)
+	}
+
+	mod.SetDataLayout(target.DataLayout())
+	mod.SetTarget(targetTriple)
+
+	err = generator.Generate(&mod, target)
 	if err != nil {
 		return "", err
 	}
 
-	if err := os.WriteFile(outputFile+".ll", []byte(ir), 0644); err != nil {
-		return "", fmt.Errorf("failed to write LLVM IR to file for %s: %w", input, err)
-	}
-
 	if opt > 0 {
-		if err := optimizer.Optimize(outputFile+".ll", outputFile+".ll", opt); err != nil {
+		if err := optimizer.Optimize(&mod, opt); err != nil {
 			return "", err
 		}
 	}
 
-	if err := assembler.Assemble(outputFile+".ll", outputFile+".o", outputPrefix, saveIntermediaries, idx); err != nil {
+	objFile, err := assembler.Assemble(&mod, outputPrefix, saveIntermediaries, idx, targetMachine)
+
+	if err != nil {
 		return "", fmt.Errorf("assemble failed for %s: %w", input, err)
 	}
 
-	return outputFile + ".o", nil
+	return objFile, nil
 }
