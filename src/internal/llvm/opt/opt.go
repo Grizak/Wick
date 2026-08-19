@@ -1,17 +1,11 @@
 package opt
 
 import (
-	"fmt"
-
-	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
+	"tinygo.org/x/go-llvm"
 )
 
-func Optimize(inputFile, outputFile string, level int) error {
-	optPath := toolchain.OptPath()
-
-	if err := toolchain.ExecuteCommand(optPath, fmt.Sprintf("-O%d", level), "-S", inputFile, "-o", outputFile); err != nil {
-		return err
-	}
-
+func Optimize(mod *llvm.Module, level int) error {
+	// TODO: Implement optimization passes based on the level
+	// For now, just return nil to indicate no error.
 	return nil
 }
