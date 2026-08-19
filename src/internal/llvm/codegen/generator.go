@@ -9,6 +9,7 @@ import (
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
 	"github.com/Grizak/Wick/src/internal/target"
 	"github.com/Grizak/Wick/src/internal/types"
+	"tinygo.org/x/go-llvm"
 )
 
 type Scope struct {
@@ -49,19 +50,9 @@ func NewGenerator(root *ast.NodeProgram, filename string) *Generator {
 	}
 }
 
-func (g *Generator) Generate(triple string) (string, error) {
+func (g *Generator) Generate(mod *llvm.Module, target target.Target) error {
 	g.globalScope = g.scope
-	target, err := target.NewTarget(triple)
-	if err != nil {
-		return "", err
-	}
 	g.target = &target
-	// Write some metadata about the file (based on target)
-	g.writeLine(fmt.Sprintf(`target triple = "%s"`, triple))
-	g.writeLine(fmt.Sprintf(`target datalayout = "%s"`, target.DataLayout()))
-
-	g.writeLine(fmt.Sprintf(`source_filename = "%s"`, g.fileName))
-
 	// Write LLVM IR module header
 	g.writeLine("")
 	g.writeLine(fmt.Sprintf(`define void @%s() {`, target.EntryPoint()))
@@ -69,7 +60,7 @@ func (g *Generator) Generate(triple string) (string, error) {
 
 	for _, statement := range g.root.Statements {
 		if err := g.generateStatement(&statement); err != nil {
-			return "", err
+			return err
 		}
 	}
 
@@ -85,11 +76,11 @@ func (g *Generator) Generate(triple string) (string, error) {
 	g.writeLine("    unreachable")
 	g.writeLine("}")
 
-	if strings.HasSuffix(triple, "-pc-windows-msvc") {
+	if strings.HasSuffix(target.Triple(), "-pc-windows-msvc") {
 		g.writeLine(`declare void @ExitProcess(i32)`)
 	}
 
-	return g.output.String() + "\n" + g.functions.String(), nil
+	return nil
 }
 
 func (g *Generator) generateExit(exit *ast.NodeExit) error {
