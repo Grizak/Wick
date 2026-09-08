@@ -4,3 +4,5 @@ dist
 project.zip
 
 notes/*
+
+node_modules
