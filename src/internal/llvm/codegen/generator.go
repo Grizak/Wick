@@ -50,40 +50,73 @@ func NewGenerator(root *ast.NodeProgram, filename string) *Generator {
 	}
 }
 
-func (g *Generator) Generate(mod *llvm.Module, target target.Target) error {
+func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm.Builder, ctx llvm.Context) error {
 	g.globalScope = g.scope
 	g.target = &target
-	// Write LLVM IR module header
-	g.writeLine("")
-	g.writeLine(fmt.Sprintf(`define void @%s() {`, target.EntryPoint()))
-	g.writeLine(`entry:`)
+
+	fnType := llvm.FunctionType(ctx.VoidType(), []llvm.Type{}, false)
+	fn := llvm.AddFunction(mod, target.EntryPoint(), fnType)
+
+	entry := ctx.AddBasicBlock(fn, "entry")
+	builder.SetInsertPointAtEnd(entry)
 
 	for _, statement := range g.root.Statements {
-		if err := g.generateStatement(&statement); err != nil {
+		if err := g.generateStatement(mod, builder, ctx, &statement); err != nil {
 			return err
 		}
 	}
 
-	g.writeLine(`    ret void`)
-	g.writeLine(`}`)
-	g.writeLine("")
-
 	// Exit func
-	g.writeLine(`define void @exit(i32 %code) {`)
-	g.writeLine("entry:")
-	g.writeLine("    %code64 = sext i32 %code to i64")
-	g.writeLine("    call void " + target.SysExit())
-	g.writeLine("    unreachable")
-	g.writeLine("}")
+	i32 := ctx.Int32Type()
+	i64 := ctx.Int64Type()
+
+	fnTypeExit := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i32}, false)
+	fnExit := llvm.AddFunction(mod, "exit", fnTypeExit)
+
+	entryExit := ctx.AddBasicBlock(fnExit, "entry")
+	builder.SetInsertPointAtEnd(entryExit)
+
+	code := fnExit.Param(0)
+
+	// %code64 = sext i32 %code to i64
+	code64 := builder.CreateSExt(code, i64, "code64")
+
+	// the inline-asm callee: void(i64)
+	asmFnType := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i64}, false)
+
+	// this is where target.SysExit() plugs in — the asm string + constraints
+	// it currently produces as a raw string in your text backend
+	sysExitAsm := llvm.InlineAsm(
+		asmFnType,
+		target.SysExit(), // e.g. "syscall" body text
+		"",               // e.g. "{rdi}" or whatever operand constraints you use
+		true,             // hasSideEffects
+		false,            // isAlignStack
+		0,                // dialect (0 = ATT, 1 = Intel)
+		false,            // canThrow
+	)
+
+	// call void asm "...", "..."(i64 %code64)
+	builder.CreateCall(asmFnType, sysExitAsm, []llvm.Value{code64}, "")
+
+	// unreachable
+	builder.CreateUnreachable()
 
 	if strings.HasSuffix(target.Triple(), "-pc-windows-msvc") {
-		g.writeLine(`declare void @ExitProcess(i32)`)
+		i32 := ctx.Int32Type()
+
+		declTypeExitProcess := llvm.FunctionType(ctx.VoidType(), []llvm.Type{i32}, false)
+		llvm.AddFunction(mod, "ExitProcess", declTypeExitProcess)
+	}
+
+	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (g *Generator) generateExit(exit *ast.NodeExit) error {
+func (g *Generator) generateExit(mod llvm.Module, builder llvm.Builder, ctx llvm.Context, exit *ast.NodeExit) error {
 	expr, err := g.generateExpression(exit.Expr)
 	if err != nil {
 		return err
@@ -98,6 +131,7 @@ func (g *Generator) generateExit(exit *ast.NodeExit) error {
 	// If it's a constant int, we can use it directly
 	if _, err := strconv.Atoi(expr); err == nil {
 		// It's a numeric constant, use as-is but ensure it's in int32 range
+		builder.CreateCall(ctx.VoidType(), "exit", []llvm.Value{ctx.Int32Type()}, "exit")
 		g.writeLine(fmt.Sprintf("    call void @exit(i32 %s)", expr))
 		return nil
 	}

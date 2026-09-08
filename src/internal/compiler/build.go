@@ -202,7 +202,10 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 	mod.SetDataLayout(target.DataLayout())
 	mod.SetTarget(targetTriple)
 
-	err = generator.Generate(&mod, target)
+	builder := context.NewBuilder()
+	defer builder.Dispose()
+
+	err = generator.Generate(mod, target, builder, context)
 	if err != nil {
 		return "", err
 	}
