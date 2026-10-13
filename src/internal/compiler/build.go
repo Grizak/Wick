@@ -152,19 +152,19 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 		return "", err
 	}
 
-	tc := typesys.NewTypeChecker()
+	tc := typesys.NewTypeChecker(input)
 	if err := tc.CheckProgram(&program); err != nil {
 		return "", err
 	}
 
 	outputFile := outputPrefix + "_" + string(randchars.LowerAlpha(8))
 
-	generator := codegen.NewGenerator(&program)
+	generator := codegen.NewGenerator(&program, input)
 	targetTriple, ok := target.TargetTriples[targetTriple]
 	if !ok {
 		return "", fmt.Errorf("unsupported target: %s", targetTriple)
 	}
-	ir, err := generator.Generate(input, targetTriple)
+	ir, err := generator.Generate(targetTriple)
 
 	if err != nil {
 		return "", err
