@@ -76,7 +76,7 @@ builds:
 
 archives:
   - id: unix-archives
-    builds:
+    ids:
       - linux-amd64
       - linux-arm64
       - darwin-arm64
@@ -89,7 +89,7 @@ archives:
       # - src/internal/assets/**
 
   - id: windows-archives
-    builds:
+    ids:
       - windows-amd64
       - windows-arm64
     formats:
@@ -100,7 +100,7 @@ archives:
 nfpms:
   - id: linux-packages
     package_name: wick
-    builds:
+    ids:
       - linux-amd64
       - linux-arm64
 
