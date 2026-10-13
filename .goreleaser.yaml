@@ -22,18 +22,18 @@ builds:
       - "-s -w"
       - "-X main.version={{ .Version }}"
 
-  - id: linux-arm64
-    main: ./src/cmd/wick
-    binary: wick
-    goos:
-      - linux
-    goarch:
-      - arm64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - "-s -w"
-      - "-X main.version={{ .Version }}"
+  # - id: linux-arm64
+  #   main: ./src/cmd/wick
+  #   binary: wick
+  #   goos:
+  #     - linux
+  #   goarch:
+  #     - arm64
+  #   env:
+  #     - CGO_ENABLED=0
+  #   ldflags:
+  #     - "-s -w"
+  #     - "-X main.version={{ .Version }}"
 
   - id: darwin-arm64
     main: ./src/cmd/wick
@@ -61,18 +61,18 @@ builds:
       - "-s -w"
       - "-X main.version={{ .Version }}"
 
-  - id: windows-arm64
-    main: ./src/cmd/wick
-    binary: wick.exe
-    goos:
-      - windows
-    goarch:
-      - arm64
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - "-s -w"
-      - "-X main.version={{ .Version }}"
+  # - id: windows-arm64
+  #   main: ./src/cmd/wick
+  #   binary: wick.exe
+  #   goos:
+  #     - windows
+  #   goarch:
+  #     - arm64
+  #   env:
+  #     - CGO_ENABLED=0
+  #   ldflags:
+  #     - "-s -w"
+  #     - "-X main.version={{ .Version }}"
 
 archives:
   - id: unix-archives
@@ -111,10 +111,10 @@ nfpms:
 
     bindir: /usr/bin
 
-    maintainer: "Your Name <you@example.com>"
-    description: "WICK command-line tool"
-    homepage: "https://example.com/wick"
-    license: "Your license"
+    maintainer: "Isak Grönlund <gronlundisak11@gmail.com> (https://isaksweb.xyz)"
+    description: "WICK Programming Language - A simple and efficient programming language for modern development."
+    homepage: "https://github.com/Grizak/Wick"
+    license: "MIT"
 
     contents:
       - src: LICENSE
