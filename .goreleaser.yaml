@@ -50,7 +50,7 @@ builds:
 
   - id: windows-amd64
     main: ./src/cmd/wick
-    binary: wick.exe
+    binary: wick
     goos:
       - windows
     goarch:
@@ -63,7 +63,7 @@ builds:
 
   # - id: windows-arm64
   #   main: ./src/cmd/wick
-  #   binary: wick.exe
+  #   binary: wick
   #   goos:
   #     - windows
   #   goarch:
