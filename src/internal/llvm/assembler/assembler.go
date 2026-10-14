@@ -1,6 +1,7 @@
 package assembler
 
 import (
+	"fmt"
 	"os"
 
 	"tinygo.org/x/go-llvm"
@@ -13,7 +14,7 @@ func Assemble(mod *llvm.Module, outFile string, save bool, idx int, targetMachin
 	}
 
 	bytes := buf.Bytes()
-	objFile := outFile + string(idx) + ".o"
+	objFile := outFile + fmt.Sprint(idx) + ".o"
 	if err := os.WriteFile(objFile, bytes, 0644); err != nil {
 		return "", err
 	}
@@ -25,13 +26,13 @@ func Assemble(mod *llvm.Module, outFile string, save bool, idx int, targetMachin
 		}
 
 		bytes := buf.Bytes()
-		objFile := outFile + string(idx) + ".s"
+		objFile := outFile + fmt.Sprint(idx) + ".s"
 		if err := os.WriteFile(objFile, bytes, 0644); err != nil {
 			return "", err
 		}
 
 		ir := mod.String()
-		if err := os.WriteFile(outFile+string(idx)+".ll", []byte(ir), 0644); err != nil {
+		if err := os.WriteFile(outFile+fmt.Sprint(idx)+".ll", []byte(ir), 0644); err != nil {
 			return "", err
 		}
 	}
