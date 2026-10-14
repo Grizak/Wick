@@ -1,40 +1,19 @@
-GO = go
-BUILD_DIR ?= build
-TARGET ?= wick
-DARWIN_TARGET ?= $(TARGET)
-WIN_TARGET ?= $(TARGET)
-LINUX_TARGET ?= $(TARGET)
-TARGET_FULL = $(BUILD_DIR)/$(TARGET)
-DARWIN_TARGET_FULL = $(BUILD_DIR)/$(DARWIN_TARGET)
-WIN_TARGET_FULL = $(BUILD_DIR)/$(WIN_TARGET)
-LINUX_TARGET_FULL = $(BUILD_DIR)/$(LINUX_TARGET)
-SOURCES = src/cmd/wick/main.go src/cmd/wick/root.go src/cmd/wick/build.go src/cmd/wick/version.go
+.PHONY: release snapshot build clean check package
 
-.PHONY: current win linux darwin all clean art
+release:
+	goreleaser release --clean
 
-current: prepare
-	./build.sh $(TARGET_FULL) $(SOURCES)
+snapshot:
+	goreleaser release --snapshot --clean
 
-win: prepare
-	GOOS=windows GOARCH=amd64 WICK_RELEASE=yes ./build.sh $(WIN_TARGET_FULL) $(SOURCES)
+build:
+	goreleaser build --snapshot --clean
 
-linux: prepare
-	GOOS=linux GOARCH=amd64 WICK_RELEASE=yes ./build.sh $(LINUX_TARGET_FULL) $(SOURCES)
+check:
+	goreleaser check
 
-darwin: prepare
-	GOOS=darwin GOARCH=arm64 WICK_RELEASE=yes ./build.sh $(DARWIN_TARGET_FULL) $(SOURCES)
+clean:
+	rm -rf dist build
 
-all: win linux darwin
-	@echo "Done"
-
-prepare: assets
-	mkdir -p $(BUILD_DIR)
-
-art:
-	rm -rf dist 2>/dev/null
-
-clean: art
-	rm -rf $(BUILD_DIR) 2>/dev/null
-
-assets:
-	cp LICENSE src/internal/assets/LICENSE
+package:
+	goreleaser release --skip=publish --clean

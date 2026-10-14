@@ -1,0 +1,138 @@
+version: 2
+
+project_name: wick
+
+before:
+  hooks:
+    - mkdir -p src/internal/assets
+    - cp LICENSE src/internal/assets/LICENSE
+    - go mod tidy
+
+builds:
+  - id: linux-amd64
+    main: ./src/cmd/wick
+    binary: wick
+    goos:
+      - linux
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+  # - id: linux-arm64
+  #   main: ./src/cmd/wick
+  #   binary: wick
+  #   goos:
+  #     - linux
+  #   goarch:
+  #     - arm64
+  #   env:
+  #     - CGO_ENABLED=0
+  #   ldflags:
+  #     - "-s -w"
+  #     - "-X main.version={{ .Version }}"
+
+  - id: darwin-arm64
+    main: ./src/cmd/wick
+    binary: wick
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+  - id: windows-amd64
+    main: ./src/cmd/wick
+    binary: wick
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+  # - id: windows-arm64
+  #   main: ./src/cmd/wick
+  #   binary: wick
+  #   goos:
+  #     - windows
+  #   goarch:
+  #     - arm64
+  #   env:
+  #     - CGO_ENABLED=0
+  #   ldflags:
+  #     - "-s -w"
+  #     - "-X main.version={{ .Version }}"
+
+archives:
+  - id: unix-archives
+    ids:
+      - linux-amd64
+      - linux-arm64
+      - darwin-arm64
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+      # Add other runtime files here if needed:
+      # - README.md
+      # - src/internal/assets/**
+
+  - id: windows-archives
+    ids:
+      - windows-amd64
+      - windows-arm64
+    formats:
+      - zip
+    files:
+      - LICENSE
+
+nfpms:
+  - id: linux-packages
+    package_name: wick
+    ids:
+      - linux-amd64
+      - linux-arm64
+
+    formats:
+      - deb
+      - rpm
+      - archlinux
+
+    bindir: /usr/bin
+
+    maintainer: "Isak Grönlund <gronlundisak11@gmail.com> (https://isaksweb.xyz)"
+    description: "WICK Programming Language - A simple and efficient programming language for modern development."
+    homepage: "https://github.com/Grizak/Wick"
+    license: "MIT"
+
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/wick/LICENSE
+        file_info:
+          mode: 0644
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge pull request"
+      - "^Merge branch"
+      - "^docs:"
+      - "^test:"
