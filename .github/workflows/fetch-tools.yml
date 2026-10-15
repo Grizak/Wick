@@ -51,9 +51,7 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         run: |
-          LLVM_VERSION=${{ env.LLVM_VERSION }}
-
-          echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
+          echo "version=${{ env.LLVM_VERSION }}" >> $GITHUB_OUTPUT
 
       - name: Cache LLVM source
         id: cache-llvm
@@ -197,9 +195,10 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         shell: pwsh
+        env:
+          LLVM_VERSION: ${{ env.LLVM_VERSION }}
         run: |
-          $version = ${{ env.LLVM_VERSION }}
-          "version=$version" >> $env:GITHUB_OUTPUT
+          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
       - name: Cache LLVM source
         id: cache-llvm
@@ -337,10 +336,10 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         shell: pwsh
+        env:
+          LLVM_VERSION: ${{ env.LLVM_VERSION }}
         run: |
-          $version = ${{ env.LLVM_VERSION }}
-
-          "version=$version" >> $env:GITHUB_OUTPUT
+          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
       - name: Cache LLVM source
         id: cache-llvm
