@@ -9,6 +9,9 @@ concurrency:
   group: fetch-tools
   cancel-in-progress: true
 
+env:
+  LLVM_VERSION: "20.1.8"
+
 jobs:
   fetch-unix:
     strategy:
@@ -18,6 +21,10 @@ jobs:
             platform: linux_amd64
             lld_binary: ld.lld
             artifact_name: linux-amd64-tools
+          - os: ubuntu-24.04-arm
+            platform: linux_arm64
+            lld_binary: ld.lld
+            artifact_name: linux-arm64-tools
           - os: macos-15
             platform: darwin_arm64
             lld_binary: ld64.lld
@@ -27,7 +34,9 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Cleanup
-        run: rm -rf src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+        run: |
+          rm -rf src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+          rm -rf src/internal/llvm/toolchain/lib/${{ matrix.platform }}
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -42,13 +51,7 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         run: |
-          LLVM_VERSION=$(
-            git ls-remote --tags --refs https://github.com/llvm/llvm-project.git \
-              | sed 's|.*refs/tags/llvmorg-||' \
-              | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?$' \
-              | sort -V \
-              | tail -1
-          )
+          LLVM_VERSION=${{ env.LLVM_VERSION }}
 
           echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
 
@@ -76,7 +79,7 @@ jobs:
           path: llvm-project/build
           key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
 
-      - name: Build llc, opt, and lld (Linux)
+      - name: Build LLVM libraries and lld (Linux)
         if: runner.os == 'Linux'
         run: |
           cd llvm-project
@@ -84,6 +87,7 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DLLVM_BUILD_STATIC=ON \
+            -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS="lld" \
             -DBUILD_SHARED_LIBS=OFF \
@@ -91,9 +95,9 @@ jobs:
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
             -DCMAKE_EXE_LINKER_FLAGS="-static"
-          ninja -C build llc opt lld
+          ninja -C build lld
 
-      - name: Build llc, opt, and lld (macOS)
+      - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
         run: |
           cd llvm-project
@@ -104,57 +108,67 @@ jobs:
           cmake -S llvm -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS="lld" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build llc opt lld
+          ninja -C build lld
 
-      - name: Verify macOS binaries
+      - name: Create static LLVM archive (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
+          mkdir -p "$OUT"
+          {
+            echo "CREATE $OUT/libLLVM.a"
+            for f in llvm-project/build/lib/*.a; do echo "ADDLIB $f"; done
+            echo "SAVE"
+            echo "END"
+          } | ar -M
+          ranlib "$OUT/libLLVM.a"
+
+      - name: Create static LLVM archive (macOS)
         if: runner.os == 'macOS'
         run: |
-          test -f llvm-project/build/bin/llc
-          test -f llvm-project/build/bin/opt
-          test -f llvm-project/build/bin/ld64.lld
+          OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
+          mkdir -p "$OUT"
+          libtool -static -o "$OUT/libLLVM.a" llvm-project/build/lib/*.a
 
       - name: Prepare binaries
         run: |
-          mkdir -p src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          cp llvm-project/build/bin/llc  src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
-          cp llvm-project/build/bin/opt  src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
-          cp llvm-project/build/bin/${{ matrix.lld_binary }} \
-             src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
-          chmod +x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/*
+          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+          mkdir -p "$BIN"
+          cp llvm-project/build/bin/${{ matrix.lld_binary }} "$BIN/${{ matrix.lld_binary }}"
+          chmod +x "$BIN"/*
+
+      - name: Verify outputs
+        run: |
+          test -f src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+          test -s src/internal/llvm/toolchain/lib/${{ matrix.platform }}/libLLVM.a
 
       - name: Strip binaries (Linux)
         if: runner.os == 'Linux'
-        run: |
-          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
-          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
-          strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+        run: strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
 
       - name: Strip binaries (macOS)
         if: runner.os == 'macOS'
-        run: |
-          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/llc
-          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/opt
-          strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+        run: strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
 
       - name: Write versions
         run: |
           BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          LLC_VERSION=$($BIN/llc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
           LLD_VERSION=$($BIN/${{ matrix.lld_binary }} --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          OPT_VERSION=$($BIN/opt --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          echo "{\"llc\": \"$LLC_VERSION\", \"lld\": \"$LLD_VERSION\", \"opt\": \"$OPT_VERSION\"}" \
-            > $BIN/versions.json
+          echo "{\"lld\": \"$LLD_VERSION\"}" > $BIN/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
-          path: src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
+          path: |
+            src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
 
   fetch-windows-amd64:
     runs-on: windows-latest
@@ -166,7 +180,8 @@ jobs:
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
-            src/internal/llvm/toolchain/bin/windows_amd64
+            src/internal/llvm/toolchain/bin/windows_amd64, `
+            src/internal/llvm/toolchain/lib/windows_amd64
 
       - name: Install LLVM
         shell: pwsh
@@ -183,7 +198,7 @@ jobs:
         id: llvm-version
         shell: pwsh
         run: |
-          $version = (& clang --version)[0] -replace '^clang version ([^ ]+).*','$1'
+          $version = ${{ env.LLVM_VERSION }}
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Cache LLVM source
@@ -209,7 +224,7 @@ jobs:
           path: llvm-project/build
           key: llvm-build-windows-amd64-${{ steps.llvm-version.outputs.version }}
 
-      - name: Build llc, opt, and lld
+      - name: Build LLVM libraries and lld
         shell: pwsh
         run: |
           cmake `
@@ -221,6 +236,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ `
             -DCMAKE_ASM_COMPILER=clang `
             -DLLVM_BUILD_STATIC=ON `
+            -DLLVM_BUILD_TOOLS=OFF `
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
             -DLLVM_ENABLE_PROJECTS="lld" `
             -DBUILD_SHARED_LIBS=OFF `
@@ -228,15 +244,24 @@ jobs:
             -DLLVM_ENABLE_ZLIB=OFF `
             -DLLVM_ENABLE_ZSTD=OFF
 
-          cmake --build llvm-project/build --target llc opt lld
+          cmake --build llvm-project/build
 
-          $out = "src/internal/llvm/toolchain/bin/windows_amd64"
-
+      - name: Create static LLVM archive
+        shell: pwsh
+        run: |
+          $out = "src/internal/llvm/toolchain/lib/windows_amd64"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
 
-          Copy-Item llvm-project/build/bin/llc.exe $out
+          $libs = Get-ChildItem llvm-project/build/lib/*.lib | ForEach-Object { $_.FullName }
+          llvm-lib /OUT:"$out\LLVM.lib" $libs
+
+      - name: Prepare binaries
+        shell: pwsh
+        run: |
+          $out = "src/internal/llvm/toolchain/bin/windows_amd64"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
           Copy-Item llvm-project/build/bin/lld-link.exe $out
-          Copy-Item llvm-project/build/bin/opt.exe $out
 
       - name: Copy kernel32.lib
         shell: pwsh
@@ -249,41 +274,178 @@ jobs:
             "$($sdk.FullName)\um\x64\kernel32.lib" `
             src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
 
-      - name: Strip binaries
+      - name: Verify outputs
         shell: pwsh
         run: |
-          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/llc.exe
-          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/opt.exe
-          llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          Test-Path src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          Test-Path src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
+
+      - name: Strip binaries
+        shell: pwsh
+        run: llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
 
       - name: Write versions
         shell: pwsh
         run: |
           $bin = "src/internal/llvm/toolchain/bin/windows_amd64"
 
-          $llc = (& "$bin\llc.exe" --version |
-            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
-
           $lld = (& "$bin\lld-link.exe" --version |
             Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
 
-          $opt = (& "$bin\opt.exe" --version |
-            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
-
           @{
-            llc = $llc
             lld = $lld
-            opt = $opt
           } | ConvertTo-Json -Compress |
             Set-Content "$bin\versions.json"
 
       - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
-          path: src/internal/llvm/toolchain/bin/windows_amd64/
+          path: |
+            src/internal/llvm/toolchain/bin/windows_amd64/
+            src/internal/llvm/toolchain/lib/windows_amd64/
+
+  fetch-windows-arm64:
+    runs-on: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cleanup
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
+            src/internal/llvm/toolchain/bin/windows_arm64, `
+            src/internal/llvm/toolchain/lib/windows_arm64
+
+      # Native ARM64 MSVC environment. The Chocolatey LLVM package is x64
+      # only, so the LLVM build itself uses cl.exe rather than clang.
+      - name: Setup MSVC (ARM64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      # llvm-lib and llvm-strip are host-independent tools; the x64 build
+      # runs under emulation on Windows ARM and only handles archiving here.
+      - name: Install tools
+        shell: pwsh
+        run: |
+          choco install llvm cmake ninja -y
+
+          $llvmBin = "C:\Program Files\LLVM\bin"
+          echo "$llvmBin" >> $env:GITHUB_PATH
+
+      - name: Get LLVM version
+        id: llvm-version
+        shell: pwsh
+        run: |
+          $version = ${{ env.LLVM_VERSION }}
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Cache LLVM source
+        id: cache-llvm
+        uses: actions/cache@v5
+        with:
+          path: llvm-project
+          key: llvm-source-windows_arm64-${{ steps.llvm-version.outputs.version }}
+
+      - name: Clone LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          git clone `
+            --depth 1 `
+            --branch llvmorg-${{ steps.llvm-version.outputs.version }} `
+            https://github.com/llvm/llvm-project.git
+
+      - name: Cache LLVM build
+        id: cache-llvm-build
+        uses: actions/cache@v5
+        with:
+          path: llvm-project/build
+          key: llvm-build-windows_arm64-${{ steps.llvm-version.outputs.version }}
+
+      - name: Build LLVM libraries and lld
+        shell: pwsh
+        run: |
+          cmake `
+            -S llvm-project/llvm `
+            -B llvm-project/build `
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=MinSizeRel `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DLLVM_BUILD_STATIC=ON `
+            -DLLVM_BUILD_TOOLS=OFF `
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
+            -DLLVM_ENABLE_PROJECTS="lld" `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DLLVM_ENABLE_TERMINFO=OFF `
+            -DLLVM_ENABLE_ZLIB=OFF `
+            -DLLVM_ENABLE_ZSTD=OFF
+
+          cmake --build llvm-project/build
+
+      - name: Create static LLVM archive
+        shell: pwsh
+        run: |
+          $out = "src/internal/llvm/toolchain/lib/windows_arm64"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $libs = Get-ChildItem llvm-project/build/lib/*.lib | ForEach-Object { $_.FullName }
+          llvm-lib /OUT:"$out\LLVM.lib" $libs
+
+      - name: Prepare binaries
+        shell: pwsh
+        run: |
+          $out = "src/internal/llvm/toolchain/bin/windows_arm64"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          Copy-Item llvm-project/build/bin/lld-link.exe $out
+
+      - name: Copy kernel32.lib
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+
+          Copy-Item `
+            "$($sdk.FullName)\um\arm64\kernel32.lib" `
+            src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib
+
+      - name: Verify outputs
+        shell: pwsh
+        run: |
+          Test-Path src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
+          Test-Path src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+
+      - name: Strip binaries
+        shell: pwsh
+        run: llvm-strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
+
+      - name: Write versions
+        shell: pwsh
+        run: |
+          $bin = "src/internal/llvm/toolchain/bin/windows_arm64"
+
+          $lld = (& "$bin\lld-link.exe" --version |
+            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
+
+          @{
+            lld = $lld
+          } | ConvertTo-Json -Compress |
+            Set-Content "$bin\versions.json"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-arm64-tools
+          path: |
+            src/internal/llvm/toolchain/bin/windows_arm64/
+            src/internal/llvm/toolchain/lib/windows_arm64/
 
   commit:
-    needs: [fetch-unix, fetch-windows-amd64]
+    needs: [fetch-unix, fetch-windows-amd64, fetch-windows-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -302,22 +464,32 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: linux-amd64-tools
-          path: src/internal/llvm/toolchain/bin/linux_amd64/
+          path: src/internal/llvm/toolchain/
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: linux-arm64-tools
+          path: src/internal/llvm/toolchain/
 
       - uses: actions/download-artifact@v6
         with:
           name: darwin-arm64-tools
-          path: src/internal/llvm/toolchain/bin/darwin_arm64/
+          path: src/internal/llvm/toolchain/
 
       - uses: actions/download-artifact@v6
         with:
           name: windows-amd64-tools
-          path: src/internal/llvm/toolchain/bin/windows_amd64/
+          path: src/internal/llvm/toolchain/
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: windows-arm64-tools
+          path: src/internal/llvm/toolchain/
 
       - name: Commit and push
         run: |
           set -e
-          git add src/internal/llvm/toolchain/bin/
+          git add src/internal/llvm/toolchain/
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping push"
             exit 0
