@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux_amd64
             lld_binary: ld.lld
             artifact_name: linux-amd64-tools
@@ -169,7 +169,7 @@ jobs:
             src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
 
   fetch-windows-amd64:
-    runs-on: windows-latest
+    runs-on: windows-11
 
     steps:
       - uses: actions/checkout@v6
