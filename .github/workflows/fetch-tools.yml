@@ -405,13 +405,19 @@ jobs:
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
-          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
-            Sort-Object Name -Descending |
+          $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
+          $kernel32 = Get-ChildItem $libRoot -Directory |
+            Sort-Object { [version]$_.Name } -Descending |
+            ForEach-Object { Join-Path $_.FullName "um\arm64\kernel32.lib" } |
+            Where-Object { Test-Path $_ } |
             Select-Object -First 1
 
-          Copy-Item `
-            "$($sdk.FullName)\um\arm64\kernel32.lib" `
-            src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib
+          if (-not $kernel32) {
+            throw "No ARM64 kernel32.lib found under $libRoot"
+          }
+
+          Copy-Item $kernel32 `
+            "src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib"
 
       - name: Verify outputs
         shell: pwsh
