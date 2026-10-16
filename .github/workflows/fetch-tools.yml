@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "version=${{ env.LLVM_VERSION }}" >> $GITHUB_OUTPUT
 
-      - name: Re-clone if cache is invalid
+      - name: Clone LLVM
         run: |
           git clone --depth 1 \
             --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
@@ -379,11 +379,14 @@ jobs:
         shell: pwsh
         run: |
           $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
+
           $kernel32 = Get-ChildItem $libRoot -Directory |
+            Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
             Sort-Object { [version]$_.Name } -Descending |
-            ForEach-Object { Join-Path $_.FullName "um\arm64\kernel32.lib" } |
-            Where-Object { Test-Path $_ } |
-            Select-Object -First 1
+            ForEach-Object {
+              $candidate = Join-Path $_.FullName "um\arm64\kernel32.lib"
+              if (Test-Path $candidate) { $candidate; break }
+            }
 
           if (-not $kernel32) {
             throw "No ARM64 kernel32.lib found under $libRoot"
