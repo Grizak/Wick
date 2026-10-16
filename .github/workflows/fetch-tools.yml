@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux_amd64
             lld_binary: ld.lld
             artifact_name: linux-amd64-tools
@@ -51,26 +51,13 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         run: |
-          LLVM_VERSION=${{ env.LLVM_VERSION }}
+          echo "version=${{ env.LLVM_VERSION }}" >> $GITHUB_OUTPUT
 
-          echo "version=$LLVM_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
-
-      - name: Re-clone if cache is invalid
+      - name: Clone LLVM
         run: |
-          if [ ! -f llvm-project/llvm/CMakeLists.txt ]; then
-            rm -rf llvm-project
-
-            git clone --depth 1 \
-              --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
-              https://github.com/llvm/llvm-project.git
-          fi
+          git clone --depth 1 \
+            --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+            https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
@@ -197,19 +184,12 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         shell: pwsh
+        env:
+          LLVM_VERSION: ${{ env.LLVM_VERSION }}
         run: |
-          $version = ${{ env.LLVM_VERSION }}
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-windows-${{ steps.llvm-version.outputs.version }}
+          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
       - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           git clone `
@@ -337,20 +317,12 @@ jobs:
       - name: Get LLVM version
         id: llvm-version
         shell: pwsh
+        env:
+          LLVM_VERSION: ${{ env.LLVM_VERSION }}
         run: |
-          $version = ${{ env.LLVM_VERSION }}
-
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-windows_arm64-${{ steps.llvm-version.outputs.version }}
+          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
       - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           git clone `
@@ -406,13 +378,22 @@ jobs:
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
-          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
-            Sort-Object Name -Descending |
-            Select-Object -First 1
+          $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
 
-          Copy-Item `
-            "$($sdk.FullName)\um\arm64\kernel32.lib" `
-            src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib
+          $kernel32 = Get-ChildItem $libRoot -Directory |
+            Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
+            Sort-Object { [version]$_.Name } -Descending |
+            ForEach-Object {
+              $candidate = Join-Path $_.FullName "um\arm64\kernel32.lib"
+              if (Test-Path $candidate) { $candidate; break }
+            }
+
+          if (-not $kernel32) {
+            throw "No ARM64 kernel32.lib found under $libRoot"
+          }
+
+          Copy-Item $kernel32 `
+            "src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib"
 
       - name: Verify outputs
         shell: pwsh
