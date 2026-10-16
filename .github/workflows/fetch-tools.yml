@@ -53,22 +53,11 @@ jobs:
         run: |
           echo "version=${{ env.LLVM_VERSION }}" >> $GITHUB_OUTPUT
 
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
-
       - name: Re-clone if cache is invalid
         run: |
-          if [ ! -f llvm-project/llvm/CMakeLists.txt ]; then
-            rm -rf llvm-project
-
-            git clone --depth 1 \
-              --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
-              https://github.com/llvm/llvm-project.git
-          fi
+          git clone --depth 1 \
+            --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
+            https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
@@ -200,15 +189,7 @@ jobs:
         run: |
           "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-windows-${{ steps.llvm-version.outputs.version }}
-
       - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           git clone `
@@ -341,15 +322,7 @@ jobs:
         run: |
           "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
 
-      - name: Cache LLVM source
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: llvm-project
-          key: llvm-source-windows-${{ steps.llvm-version.outputs.version }}
-
       - name: Clone LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           git clone `
