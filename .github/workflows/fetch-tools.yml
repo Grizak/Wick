@@ -2,8 +2,6 @@ name: Fetch Tools
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * 1,4"
 
 concurrency:
   group: fetch-tools
@@ -480,4 +478,3 @@ jobs:
           git pull --no-rebase origin master
           git merge --no-ff chore/update-tools
           git -c http.lowSpeedLimit=0 -c http.lowSpeedTime=600 push origin master
-
