@@ -435,7 +435,6 @@ jobs:
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
           lfs: false
-<
       - name: Configure Forgejo credentials for LFS
         run: |
           umask 077
