@@ -425,20 +425,30 @@ jobs:
 
   commit:
     needs: [fetch-unix, fetch-windows-amd64, fetch-windows-arm64]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, lfs-home]
     permissions:
       contents: write
+    env:
+      GIT_LFS_SKIP_SMUDGE: "1" # don't download the old binaries; the artifacts replace them
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
+          lfs: false
+<
+      - name: Configure Forgejo credentials for LFS
+        run: |
+          umask 077
+          printf 'machine git-lfs.isaksweb.xyz\nlogin %s\npassword %s\n' \
+            "${{ secrets.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
 
       - name: Setup git
         run: |
+          git lfs install --local
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config pull.rebase false
-          git checkout -B chore/update-tools  # -B resets the branch if it already exists
+          git checkout -B chore/update-tools
 
       - uses: actions/download-artifact@v6
         with:
@@ -477,4 +487,8 @@ jobs:
           git checkout master
           git pull --no-rebase origin master
           git merge --no-ff chore/update-tools
-          git -c http.lowSpeedLimit=0 -c http.lowSpeedTime=600 push origin master
+          git push origin master
+
+      - name: Remove Forgejo credentials
+        if: always()
+        run: rm -f "$HOME/.netrc"
