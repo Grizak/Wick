@@ -427,6 +427,8 @@ jobs:
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
+          $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
+
           $kernel32 = Get-ChildItem $libRoot -Directory |
             Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
             Sort-Object { [version]$_.Name } -Descending |
