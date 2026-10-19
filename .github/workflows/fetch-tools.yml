@@ -102,6 +102,25 @@ jobs:
             -DLLVM_ENABLE_ZSTD=OFF
           ninja -C build lld
 
+      - name: Copy headers
+        run: |
+          OUT="src/internal/llvm/toolchain"
+          PLATFORM="${{ matrix.platform }}"
+
+          mkdir -p "$OUT/include/$PLATFORM/llvm" \
+                  "$OUT/include/$PLATFORM/llvm-c"
+
+          cp -R llvm-project/llvm/include/llvm/. \
+            "$OUT/include/$PLATFORM/llvm/"
+          cp -R llvm-project/llvm/include/llvm-c/. \
+            "$OUT/include/$PLATFORM/llvm-c/"
+
+          # Include generated config headers, if present.
+          if [ -d llvm-project/build/include/llvm ]; then
+            cp -R llvm-project/build/include/llvm/. \
+              "$OUT/include/$PLATFORM/llvm/"
+          fi
+
       - name: Create static LLVM archive (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -154,6 +173,7 @@ jobs:
           path: |
             src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
             src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/include/${{ matrix.platform }}/
 
   fetch-windows-amd64:
     runs-on: windows-latest
@@ -224,6 +244,21 @@ jobs:
 
           cmake --build llvm-project/build
 
+      - name: Copy headers
+        run: |
+          $platform = "windows_amd64"
+          $root = "src/internal/llvm/toolchain/include/$platform"
+
+          New-Item -ItemType Directory -Force "$root/llvm", "$root/llvm-c" |
+            Out-Null
+
+          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm/*" "$root/llvm/"
+          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm-c/*" "$root/llvm-c/"
+
+          if (Test-Path "llvm-project/build/include/llvm") {
+            Copy-Item -Recurse -Force "llvm-project/build/include/llvm/*" "$root/llvm/"
+          }
+
       - name: Create static LLVM archive
         shell: pwsh
         run: |
@@ -281,6 +316,7 @@ jobs:
           path: |
             src/internal/llvm/toolchain/bin/windows_amd64/
             src/internal/llvm/toolchain/lib/windows_amd64/
+            src/internal/llvm/toolchain/include/windows_amd64/
 
   fetch-windows-arm64:
     runs-on: windows-11-arm
@@ -356,6 +392,21 @@ jobs:
 
           cmake --build llvm-project/build
 
+      - name: Copy headers
+        run: |
+          $platform = "windows_amd64"
+          $root = "src/internal/llvm/toolchain/include/$platform"
+
+          New-Item -ItemType Directory -Force "$root/llvm", "$root/llvm-c" |
+            Out-Null
+
+          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm/*" "$root/llvm/"
+          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm-c/*" "$root/llvm-c/"
+
+          if (Test-Path "llvm-project/build/include/llvm") {
+            Copy-Item -Recurse -Force "llvm-project/build/include/llvm/*" "$root/llvm/"
+          }
+
       - name: Create static LLVM archive
         shell: pwsh
         run: |
@@ -422,6 +473,7 @@ jobs:
           path: |
             src/internal/llvm/toolchain/bin/windows_arm64/
             src/internal/llvm/toolchain/lib/windows_arm64/
+            src/internal/llvm/toolchain/include/windows_arm64/
 
   commit:
     needs: [fetch-unix, fetch-windows-amd64, fetch-windows-arm64]
