@@ -427,22 +427,21 @@ jobs:
       - name: Copy kernel32.lib
         shell: pwsh
         run: |
-          $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
-
           $kernel32 = Get-ChildItem $libRoot -Directory |
             Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
             Sort-Object { [version]$_.Name } -Descending |
             ForEach-Object {
-              $candidate = Join-Path $_.FullName "um\arm64\kernel32.lib"
-              if (Test-Path $candidate) { $candidate; break }
-            }
+              $candidate = Join-Path $_.FullName 'um\arm64\kernel32.lib'
+              if (Test-Path $candidate) { $candidate }
+            } |
+            Select-Object -First 1
 
           if (-not $kernel32) {
             throw "No ARM64 kernel32.lib found under $libRoot"
           }
 
-          Copy-Item $kernel32 `
-            "src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib"
+          $destination = 'src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib'
+          Copy-Item -LiteralPath $kernel32 -Destination $destination -Force
 
       - name: Verify outputs
         shell: pwsh
