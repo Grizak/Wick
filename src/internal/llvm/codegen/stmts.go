@@ -1,49 +1,48 @@
 package codegen
 
-import (
-	"github.com/Grizak/Wick/src/internal/ast"
-	"tinygo.org/x/go-llvm"
-)
+import "github.com/Grizak/Wick/src/internal/ast"
 
-func (g *Generator) generateStatement(mod llvm.Module, builder llvm.Builder, ctx llvm.Context, stmt *ast.NodeStatement) error {
-	if stmt.Exit != nil {
-		return g.generateExit(mod, builder, ctx, stmt.Exit)
+func (g *Generator) generateStatement(stmt *ast.NodeStatement) error {
+	switch {
+	case stmt.Exit != nil:
+		return g.generateExit(stmt.Exit)
+	case stmt.VarDecl != nil:
+		return g.generateVarDecl(stmt.VarDecl)
+	case stmt.VarAssign != nil:
+		return g.generateVarAssign(stmt.VarAssign)
+	case stmt.Block != nil:
+		return g.generateBlock(stmt.Block)
+	case stmt.If != nil:
+		return g.generateIf(stmt.If)
+	case stmt.For != nil:
+		return g.generateFor(stmt.For)
+	case stmt.Break != nil:
+		return g.generateBreak(stmt.Break)
+	case stmt.Continue != nil:
+		return g.generateContinue(stmt.Continue)
+	case stmt.Return != nil:
+		return g.generateReturn(stmt.Return)
+	default:
+		return nil
 	}
-	if stmt.VarDecl != nil {
-		return g.generateVarDecl(mod, builder, ctx, stmt.VarDecl)
-	}
-	if stmt.VarAssign != nil {
-		return g.generateVarAssign(mod, builder, ctx, stmt.VarAssign)
-	}
-	if stmt.Block != nil {
-		return g.generateBlock(mod, builder, ctx, stmt.Block)
-	}
-	if stmt.If != nil {
-		return g.generateIf(mod, builder, ctx, stmt.If)
-	}
-	if stmt.For != nil {
-		return g.generateFor(mod, builder, ctx, stmt.For)
-	}
-	if stmt.Break != nil {
-		return g.generateBreak(mod, builder, ctx, stmt.Break)
-	}
-	if stmt.Continue != nil {
-		return g.generateContinue(mod, builder, ctx, stmt.Continue)
-	}
-	if stmt.Return != nil {
-		return g.generateReturn(mod, builder, ctx, stmt.Return)
+}
+
+func (g *Generator) generateStatements(statements []ast.NodeStatement) error {
+	for i := range statements {
+		if g.currentBlockTerminated() {
+			break
+		}
+		if err := g.generateStatement(&statements[i]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (g *Generator) generateBlock(mod llvm.Module, builder llvm.Builder, ctx llvm.Context, block *ast.NodeBlock) error {
+func (g *Generator) generateBlock(block *ast.NodeBlock) error {
 	g.enterScope()
 	g.typeChecker.EnterScope()
 	defer g.exitScope()
 	defer g.typeChecker.ExitScope()
-
-	for _, stmt := range block.Statements {
-		g.generateStatement(mod, builder, ctx, &stmt)
-	}
-	return nil
+	return g.generateStatements(block.Statements)
 }

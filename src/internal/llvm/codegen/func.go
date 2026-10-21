@@ -2,15 +2,14 @@ package codegen
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
+	"tinygo.org/x/go-llvm"
 )
 
 func (g *Generator) generateNamedFuncDecl(decl *ast.NodeVarDecl) error {
 	fd := decl.Expr.FuncDecl
-
 	fnType, err := g.funcDeclType(fd)
 	if err != nil {
 		return g.error(err.Error(), decl.Pos)
@@ -25,17 +24,16 @@ func (g *Generator) generateNamedFuncDecl(decl *ast.NodeVarDecl) error {
 		}
 	}
 
-	name := fmt.Sprintf("@func_%d", g.funcCount)
+	name := fmt.Sprintf("func_%d", g.funcCount)
 	g.funcCount++
-
-	// Pre-register so the body can call itself by name
-	sym := Symbol{llvmName: name, isConst: true, symbolType: fnType}
+	fnValue := llvm.AddFunction(g.module, name, g.llvmType(fnType))
+	sym := Symbol{llvmValue: fnValue, isConst: true, symbolType: fnType}
 	if err := g.scope.declare(decl.Name, sym); err != nil {
 		return g.error(err.Error(), decl.Pos)
 	}
 	g.typeChecker.Environment().Define(decl.Name, fnType)
 
-	return g.emitFuncBody(fd, fnType, name)
+	return g.emitFuncBody(fd, fnType, fnValue, decl.Name)
 }
 
 func (g *Generator) funcDeclType(fd *ast.NodeFuncDecl) (*typesys.FunctionType, error) {
@@ -44,77 +42,75 @@ func (g *Generator) funcDeclType(fd *ast.NodeFuncDecl) (*typesys.FunctionType, e
 	if err != nil {
 		return nil, err
 	}
-	return t.(*typesys.FunctionType), nil
+	fnType, ok := t.(*typesys.FunctionType)
+	if !ok {
+		return nil, fmt.Errorf("function expression inferred non-function type")
+	}
+	return fnType, nil
 }
 
-func (g *Generator) emitFuncBody(fd *ast.NodeFuncDecl, fnType *typesys.FunctionType, name string) error {
-	savedOutput := g.output
-	funcBuf := &strings.Builder{}
-	g.output = funcBuf
+func (g *Generator) emitFuncBody(fd *ast.NodeFuncDecl, fnType *typesys.FunctionType, fnValue llvm.Value, selfName string) error {
+	previousBlock := g.builder.GetInsertBlock()
+	previousScope := g.scope
+	previousReturn := g.currentFuncReturn
+	previousEnd, previousNext := g.loopEndBlock, g.loopNextBlock
 
-	savedScope := g.scope
-	g.scope = NewScope(g.globalScope) // no enclosing locals — no closures yet
-
-	savedRet := g.currentFuncReturn
+	g.scope = NewScope(g.globalScope)
 	g.currentFuncReturn = fnType.ReturnType
-
-	savedEnd, savedNext := g.loopEndLabel, g.loopNextLabel
-	g.loopEndLabel, g.loopNextLabel = "", ""
-
-	g.typeChecker.EnterScope() // see note below re: isolation
+	g.loopEndBlock, g.loopNextBlock = llvm.BasicBlock{}, llvm.BasicBlock{}
+	g.typeChecker.EnterScope()
 
 	restore := func() {
-		g.output = savedOutput
-		g.scope = savedScope
-		g.currentFuncReturn = savedRet
-		g.loopEndLabel, g.loopNextLabel = savedEnd, savedNext
+		g.builder.SetInsertPointAtEnd(previousBlock)
+		g.scope = previousScope
+		g.currentFuncReturn = previousReturn
+		g.loopEndBlock, g.loopNextBlock = previousEnd, previousNext
 		g.typeChecker.ExitScope()
 	}
 
-	paramStrs := make([]string, len(fd.Params))
-	for i, p := range fd.Params {
-		paramStrs[i] = fmt.Sprintf("%s %%arg_%s", fnType.ParamTypes[i].LLVMType(), p.Name)
+	entry := g.context.AddBasicBlock(fnValue, "entry")
+	g.builder.SetInsertPointAtEnd(entry)
+	if selfName != "" {
+		if err := g.scope.declare(selfName, Symbol{
+			llvmValue:  fnValue,
+			isConst:    true,
+			symbolType: fnType,
+		}); err != nil {
+			restore()
+			return g.error(err.Error(), fd.Pos)
+		}
+		g.typeChecker.Environment().Define(selfName, fnType)
 	}
-	retLLVM := fnType.ReturnType.LLVMType()
-	g.writeLine(fmt.Sprintf("define %s %s(%s) {", retLLVM, name, strings.Join(paramStrs, ", ")))
-	g.writeLine("entry:")
 
-	for i, p := range fd.Params {
-		sym := Symbol{symbolType: fnType.ParamTypes[i], isConst: p.Const}
-		if p.Const {
-			sym.llvmName = fmt.Sprintf("%%arg_%s", p.Name)
+	for i, param := range fd.Params {
+		paramValue := fnValue.Param(i)
+		paramValue.SetName(param.Name)
+		sym := Symbol{symbolType: fnType.ParamTypes[i], isConst: param.Const}
+		if param.Const {
+			sym.llvmValue = paramValue
 		} else {
-			ptr := fmt.Sprintf("%%param_%s", p.Name)
-			llvmType := llvmStorageType(fnType.ParamTypes[i])
-			g.writeLine(fmt.Sprintf("    %s = alloca %s", ptr, llvmType))
-			g.writeLine(fmt.Sprintf("    store %s %%arg_%s, ptr %s", llvmType, p.Name, ptr))
-			sym.llvmName = ptr
+			ptr := g.builder.CreateAlloca(g.llvmStorageType(fnType.ParamTypes[i]), g.newValueName("param_"+param.Name))
+			g.builder.CreateStore(paramValue, ptr)
+			sym.llvmValue = ptr
 		}
-		if err := g.scope.declare(p.Name, sym); err != nil {
+		if err := g.scope.declare(param.Name, sym); err != nil {
 			restore()
-			return g.error(err.Error(), p.Pos)
+			return g.error(err.Error(), param.Pos)
 		}
-		g.typeChecker.Environment().Define(p.Name, fnType.ParamTypes[i])
+		g.typeChecker.Environment().Define(param.Name, fnType.ParamTypes[i])
 	}
 
-	for _, stmt := range fd.Body.Statements {
-		if err := g.generateStatement(&stmt); err != nil {
-			restore()
-			return err
+	if err := g.generateStatements(fd.Body.Statements); err != nil {
+		restore()
+		return err
+	}
+	if !g.currentBlockTerminated() {
+		if _, isVoid := fnType.ReturnType.(*typesys.VoidType); isVoid {
+			g.builder.CreateRetVoid()
+		} else {
+			g.builder.CreateUnreachable()
 		}
 	}
-
-	if _, isVoid := fnType.ReturnType.(*typesys.VoidType); isVoid {
-		g.writeLine("    ret void")
-	} else {
-		// Type checker should guarantee all paths return; this is a
-		// placeholder for now and will produce UB if actually reached.
-		g.writeLine("    unreachable")
-	}
-	g.writeLine("}")
-	g.writeLine("")
-
-	g.functions.WriteString(funcBuf.String())
 	restore()
 	return nil
 }
@@ -127,7 +123,7 @@ func (g *Generator) generateReturn(node *ast.NodeReturn) error {
 		if node.Expr != nil {
 			return g.error("cannot return a value from a void function", node.Pos)
 		}
-		g.writeLine("    ret void")
+		g.builder.CreateRetVoid()
 		return nil
 	}
 	if node.Expr == nil {
@@ -143,92 +139,71 @@ func (g *Generator) generateReturn(node *ast.NodeReturn) error {
 			exprType.Name(), g.currentFuncReturn.Name()), node.Pos)
 	}
 
-	val, err := g.generateExpression(*node.Expr)
+	value, err := g.generateExpression(*node.Expr)
 	if err != nil {
 		return err
 	}
-	if isFloatType(g.currentFuncReturn) && !isFloatType(exprType) {
-		converted := g.tmpVar()
-		g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", converted, val))
-		val = converted
+	value, err = g.coerceValue(value, exprType, g.currentFuncReturn, g.newValueName("coerce"))
+	if err != nil {
+		return g.error(err.Error(), node.Pos)
 	}
-	g.writeLine(fmt.Sprintf("    ret %s %s", g.currentFuncReturn.LLVMType(), val))
+	g.builder.CreateRet(value)
 	return nil
 }
 
-func (g *Generator) generateFuncCall(call *ast.NodeFuncCall) (string, error) {
+func (g *Generator) generateFuncCall(call *ast.NodeFuncCall) (llvm.Value, error) {
 	sym, exists := g.scope.lookup(call.Name)
 	if !exists {
-		return "", g.error(fmt.Sprintf("undeclared function: %s", call.Name), call.Pos)
+		return llvm.Value{}, g.error(fmt.Sprintf("undeclared function: %s", call.Name), call.Pos)
 	}
 	fnType, ok := sym.symbolType.(*typesys.FunctionType)
 	if !ok {
-		return "", g.error(fmt.Sprintf("'%s' is not callable", call.Name), call.Pos)
+		return llvm.Value{}, g.error(fmt.Sprintf("'%s' is not callable", call.Name), call.Pos)
 	}
 
 	required := fnType.RequiredArgCount()
 	if len(call.Args) < required || len(call.Args) > len(fnType.ParamTypes) {
-		return "", g.error(fmt.Sprintf("'%s' expects %d to %d argument(s), got %d",
+		return llvm.Value{}, g.error(fmt.Sprintf("'%s' expects %d to %d argument(s), got %d",
 			call.Name, required, len(fnType.ParamTypes), len(call.Args)), call.Pos)
 	}
 
-	// Fill in any omitted trailing arguments from their defaults.
 	callArgs := make([]ast.NodeExpression, len(fnType.ParamTypes))
 	copy(callArgs, call.Args)
 	for i := len(call.Args); i < len(fnType.ParamTypes); i++ {
 		callArgs[i] = *fnType.Defaults[i]
 	}
 
-	var callee string
-	if sym.isConst {
-		callee = sym.llvmName
-	} else {
-		callee = g.tmpVar()
-		g.writeLine(fmt.Sprintf("    %s = load ptr, ptr %s", callee, sym.llvmName))
+	callee := sym.llvmValue
+	fnLLVMType := g.llvmType(fnType)
+	if !sym.isConst {
+		callee = g.builder.CreateLoad(g.llvmStorageType(fnType), sym.llvmValue, g.newValueName("load_fn"))
 	}
 
-	argStrs := make([]string, len(callArgs))
+	args := make([]llvm.Value, len(callArgs))
 	for i := range callArgs {
 		argType, err := g.typeChecker.InferType(&callArgs[i])
 		if err != nil {
-			return "", g.error(fmt.Sprintf("cannot infer argument %d type: %v", i, err), callArgs[i].Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("cannot infer argument %d type: %v", i, err), callArgs[i].Pos)
 		}
-		val, err := g.generateExpression(callArgs[i])
+		value, err := g.generateExpression(callArgs[i])
 		if err != nil {
-			return "", err
+			return llvm.Value{}, err
 		}
 		paramType := fnType.ParamTypes[i]
-		if !argType.Equals(paramType) {
-			if isFloatType(paramType) && !isFloatType(argType) {
-				converted := g.tmpVar()
-				g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", converted, val))
-				val = converted
-			} else if !typesys.TryCoerce(argType, paramType) {
-				return "", g.error(fmt.Sprintf("argument %d: cannot use %s as %s",
-					i, argType.Name(), paramType.Name()), callArgs[i].Pos)
-			}
+		if !argType.Equals(paramType) && !typesys.TryCoerce(argType, paramType) {
+			return llvm.Value{}, g.error(fmt.Sprintf("argument %d: cannot use %s as %s",
+				i, argType.Name(), paramType.Name()), callArgs[i].Pos)
 		}
-		argStrs[i] = fmt.Sprintf("%s %s", paramType.LLVMType(), val)
-	}
-	args := strings.Join(argStrs, ", ")
-
-	_, isVoid := fnType.ReturnType.(*typesys.VoidType)
-
-	if sym.isConst {
-		if isVoid {
-			g.writeLine(fmt.Sprintf("    call void %s(%s)", callee, args))
-			return "", nil
+		value, err = g.coerceValue(value, argType, paramType, g.newValueName("coerce"))
+		if err != nil {
+			return llvm.Value{}, g.error(err.Error(), callArgs[i].Pos)
 		}
-		result := g.tmpVar()
-		g.writeLine(fmt.Sprintf("    %s = call %s %s(%s)", result, fnType.ReturnType.LLVMType(), callee, args))
-		return result, nil
+		args[i] = value
 	}
 
-	if isVoid {
-		g.writeLine(fmt.Sprintf("    call %s %s(%s)", fnType.LLVMType(), callee, args))
-		return "", nil
+	name := ""
+	if _, isVoid := fnType.ReturnType.(*typesys.VoidType); !isVoid {
+		name = g.newValueName("call")
 	}
-	result := g.tmpVar()
-	g.writeLine(fmt.Sprintf("    %s = call %s %s(%s)", result, fnType.LLVMType(), callee, args))
-	return result, nil
+	return g.builder.CreateCall(fnLLVMType, callee, args, name), nil
 }

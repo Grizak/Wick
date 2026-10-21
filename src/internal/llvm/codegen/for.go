@@ -1,10 +1,6 @@
 package codegen
 
-import (
-	"fmt"
-
-	"github.com/Grizak/Wick/src/internal/ast"
-)
+import "github.com/Grizak/Wick/src/internal/ast"
 
 func (g *Generator) generateFor(node *ast.NodeFor) error {
 	g.enterScope()
@@ -14,90 +10,73 @@ func (g *Generator) generateFor(node *ast.NodeFor) error {
 
 	g.clearMutableStaticValues()
 
-	loopLabel := g.newLabel("loop")
-	bodyLabel := g.newLabel("body")
-	postLabel := g.newLabel("post")
-	endLabel := g.newLabel("loop_end")
+	conditionBlock := g.newBlock("for_cond")
+	bodyBlock := g.newBlock("for_body")
+	postBlock := g.newBlock("for_post")
+	endBlock := g.newBlock("for_end")
 
-	// Save outer loop labels for nested loops
-	prevEndLabel := g.loopEndLabel
-	prevNextLabel := g.loopNextLabel
+	previousEnd, previousNext := g.loopEndBlock, g.loopNextBlock
+	g.loopEndBlock = endBlock
+	g.loopNextBlock = postBlock
 	defer func() {
-		g.loopEndLabel = prevEndLabel
-		g.loopNextLabel = prevNextLabel
+		g.loopEndBlock, g.loopNextBlock = previousEnd, previousNext
 	}()
 
-	g.loopEndLabel = endLabel
-	g.loopNextLabel = postLabel
-
-	// Init
 	if node.Init != nil {
 		if err := g.generateStatement(node.Init); err != nil {
 			return err
 		}
 	}
+	if g.currentBlockTerminated() {
+		return nil
+	}
+	g.builder.CreateBr(conditionBlock)
 
-	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
-	g.writeLine(fmt.Sprintf("%s:", loopLabel))
-
-	// Condition
-	if node.Condition != nil {
-		cond, err := g.generateCondition(*node.Condition)
+	g.builder.SetInsertPointAtEnd(conditionBlock)
+	if node.Condition == nil {
+		g.builder.CreateBr(bodyBlock)
+	} else {
+		condition, err := g.generateCondition(*node.Condition)
 		if err != nil {
 			return err
 		}
-		g.writeLine(fmt.Sprintf("    br i1 %s, label %%%s, label %%%s", cond, bodyLabel, endLabel))
-	} else {
-		g.writeLine(fmt.Sprintf("    br label %%%s", bodyLabel))
+		g.builder.CreateCondBr(condition, bodyBlock, endBlock)
 	}
 
-	// Body
-	g.writeLine(fmt.Sprintf("%s:", bodyLabel))
-	for _, stmt := range node.Body.Statements {
-		if err := g.generateStatement(&stmt); err != nil {
-			return err
-		}
+	g.builder.SetInsertPointAtEnd(bodyBlock)
+	if err := g.generateBlock(&node.Body); err != nil {
+		return err
 	}
-	g.writeLine(fmt.Sprintf("    br label %%%s", postLabel))
+	if !g.currentBlockTerminated() {
+		g.builder.CreateBr(postBlock)
+	}
 
-	// Post
-	g.writeLine(fmt.Sprintf("%s:", postLabel))
+	g.builder.SetInsertPointAtEnd(postBlock)
 	if node.Post != nil {
 		if err := g.generateStatement(node.Post); err != nil {
 			return err
 		}
 	}
-	g.writeLine(fmt.Sprintf("    br label %%%s", loopLabel))
+	if !g.currentBlockTerminated() {
+		g.builder.CreateBr(conditionBlock)
+	}
 
-	g.writeLine(fmt.Sprintf("%s:", endLabel))
+	g.builder.SetInsertPointAtEnd(endBlock)
 	return nil
 }
 
-func (g *Generator) clearMutableStaticValues() {
-	scope := g.scope
-	for scope != nil {
-		for name, sym := range scope.symbols {
-			if !sym.isConst {
-				sym.staticValue = nil
-				scope.symbols[name] = sym
-			}
-		}
-		scope = scope.parent
-	}
-}
-
 func (g *Generator) generateBreak(node *ast.NodeBreak) error {
-	if g.loopEndLabel == "" {
+	if g.loopEndBlock.IsNil() {
 		return g.error("break outside of loop", node.Pos)
 	}
-	g.writeLine(fmt.Sprintf("    br label %%%s", g.loopEndLabel))
+	g.builder.CreateBr(g.loopEndBlock)
 	return nil
 }
 
 func (g *Generator) generateContinue(node *ast.NodeContinue) error {
-	if g.loopNextLabel == "" {
+	if g.loopNextBlock.IsNil() {
 		return g.error("continue outside of loop", node.Pos)
 	}
-	g.writeLine(fmt.Sprintf("    br label %%%s", g.loopNextLabel))
+	g.builder.CreateBr(g.loopNextBlock)
 	return nil
 }

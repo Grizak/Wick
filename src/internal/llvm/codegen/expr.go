@@ -2,164 +2,128 @@ package codegen
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/types"
+	"tinygo.org/x/go-llvm"
 )
 
-func (g *Generator) generateExpression(expr ast.NodeExpression) (string, error) {
-	if expr.IntLit != nil {
-		return strconv.Itoa(*expr.IntLit), nil
-	}
-
-	if expr.FloatLit != nil {
-		// Return the float literal as a double constant
-		floatStr := strconv.FormatFloat(*expr.FloatLit, 'f', -1, 64)
-		return floatStr, nil
-	}
-
-	if expr.BoolLit != nil {
-		// Convert bool to i1 (0 or 1)
-		val := 0
+func (g *Generator) generateExpression(expr ast.NodeExpression) (llvm.Value, error) {
+	switch {
+	case expr.IntLit != nil:
+		return llvm.ConstInt(g.context.Int64Type(), uint64(*expr.IntLit), true), nil
+	case expr.FloatLit != nil:
+		return llvm.ConstFloat(g.context.DoubleType(), *expr.FloatLit), nil
+	case expr.BoolLit != nil:
+		value := uint64(0)
 		if *expr.BoolLit {
-			val = 1
+			value = 1
 		}
-		return strconv.Itoa(val), nil
+		return llvm.ConstInt(g.context.Int1Type(), value, false), nil
+	case expr.StringLit != nil:
+		return llvm.Value{}, g.error("string literals not yet supported in code generation", expr.Pos)
 	}
 
-	if expr.StringLit != nil {
-		// For now, strings not fully supported in code generation
-		return "", g.error("string literals not yet supported in code generation", expr.Pos)
+	if staticValue := g.computeStaticValue(expr); staticValue != nil {
+		exprType, err := g.typeChecker.InferType(&expr)
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		return llvm.ConstInt(g.llvmType(exprType), uint64(*staticValue), true), nil
 	}
 
-	// Try to constant-fold the expression at compile time
-	if staticVal := g.computeStaticValue(expr); staticVal != nil {
-		return strconv.Itoa(*staticVal), nil
-	}
-
-	if expr.BinExpr != nil {
-		// Determine the types of left and right operands
+	switch {
+	case expr.BinExpr != nil:
 		leftType, err := g.typeChecker.InferType(&expr.BinExpr.Left)
 		if err != nil {
-			return "", g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
 		}
-
 		rightType, err := g.typeChecker.InferType(&expr.BinExpr.Right)
 		if err != nil {
-			return "", g.error(fmt.Sprintf("cannot infer right operand type: %v", err), expr.BinExpr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("cannot infer right operand type: %v", err), expr.BinExpr.Pos)
 		}
-
-		// Generate code for operands
 		left, err := g.generateExpression(expr.BinExpr.Left)
 		if err != nil {
-			return "", err
+			return llvm.Value{}, err
 		}
 		right, err := g.generateExpression(expr.BinExpr.Right)
 		if err != nil {
-			return "", err
+			return llvm.Value{}, err
 		}
 
-		// Determine if we're doing float or int operations
-		isFloat := isFloatType(leftType) || isFloatType(rightType)
-
-		// Promote int to float if needed
-		if isFloat {
-			if !isFloatType(leftType) {
-				promoted := g.tmpVar()
-				g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", promoted, left))
-				left = promoted
-			}
-			if !isFloatType(rightType) {
-				promoted := g.tmpVar()
-				g.writeLine(fmt.Sprintf("    %s = sitofp i64 %s to double", promoted, right))
-				right = promoted
-			}
+		resultType, err := g.typeChecker.InferType(&expr)
+		if err != nil {
+			return llvm.Value{}, err
 		}
-
-		result := g.tmpVar()
+		isFloat := isFloatType(resultType)
+		left, err = g.coerceValue(left, leftType, resultType, g.newValueName("promote"))
+		if err != nil {
+			return llvm.Value{}, g.error(err.Error(), expr.BinExpr.Pos)
+		}
+		right, err = g.coerceValue(right, rightType, resultType, g.newValueName("promote"))
+		if err != nil {
+			return llvm.Value{}, g.error(err.Error(), expr.BinExpr.Pos)
+		}
 
 		switch expr.BinExpr.Op {
 		case types.BinOpAdd:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fadd double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = add i64 %s, %s", result, left, right))
+				return g.builder.CreateFAdd(left, right, g.newValueName("fadd")), nil
 			}
+			return g.builder.CreateAdd(left, right, g.newValueName("add")), nil
 		case types.BinOpSub:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fsub double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = sub i64 %s, %s", result, left, right))
+				return g.builder.CreateFSub(left, right, g.newValueName("fsub")), nil
 			}
+			return g.builder.CreateSub(left, right, g.newValueName("sub")), nil
 		case types.BinOpMul:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fmul double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = mul i64 %s, %s", result, left, right))
+				return g.builder.CreateFMul(left, right, g.newValueName("fmul")), nil
 			}
+			return g.builder.CreateMul(left, right, g.newValueName("mul")), nil
 		case types.BinOpDiv:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fdiv double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = sdiv i64 %s, %s", result, left, right))
+				return g.builder.CreateFDiv(left, right, g.newValueName("fdiv")), nil
 			}
+			return g.builder.CreateSDiv(left, right, g.newValueName("sdiv")), nil
 		default:
-			return "", g.error(fmt.Sprintf("unknown operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("unknown operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
 		}
-
-		return result, nil
-	}
-
-	if expr.Ident != nil {
+	case expr.Ident != nil:
 		sym, exists := g.scope.lookup(*expr.Ident)
 		if !exists {
-			return "", g.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), expr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), expr.Pos)
 		}
 		if sym.isConst {
-			// Constants are just their value directly
-			return sym.llvmName, nil
+			return sym.llvmValue, nil
 		}
-		// Mutable variables need a load
-		result := g.tmpVar()
-		llvmType := llvmStorageType(sym.symbolType)
-		g.writeLine(fmt.Sprintf("    %s = load %s, ptr %s", result, llvmType, sym.llvmName))
-		return result, nil
-	}
-
-	if expr.FuncCall != nil {
+		return g.builder.CreateLoad(g.llvmStorageType(sym.symbolType), sym.llvmValue, g.newValueName("load")), nil
+	case expr.FuncCall != nil:
 		return g.generateFuncCall(expr.FuncCall)
-	}
-
-	if expr.FuncDecl != nil {
+	case expr.FuncDecl != nil:
 		fnType, err := g.funcDeclType(expr.FuncDecl)
 		if err != nil {
-			return "", g.error(err.Error(), expr.Pos)
+			return llvm.Value{}, g.error(err.Error(), expr.Pos)
 		}
-		name := fmt.Sprintf("@func_%d", g.funcCount)
+		name := fmt.Sprintf("func_%d", g.funcCount)
 		g.funcCount++
-		if err := g.emitFuncBody(expr.FuncDecl, fnType, name); err != nil {
-			return "", err
+		fnValue := llvm.AddFunction(g.module, name, g.llvmType(fnType))
+		if err := g.emitFuncBody(expr.FuncDecl, fnType, fnValue, ""); err != nil {
+			return llvm.Value{}, err
 		}
-		return name, nil
+		return fnValue, nil
+	default:
+		return llvm.Value{}, g.error("unknown expression type", expr.Pos)
 	}
-
-	return "", g.error("unknown expression type", expr.Pos)
 }
 
 func (g *Generator) isStatic(expr ast.NodeExpression) bool {
 	if expr.IntLit != nil {
 		return true
 	}
-	if expr.FloatLit != nil {
-		return true
-	}
 	if expr.Ident != nil {
 		sym, exists := g.scope.lookup(*expr.Ident)
-		if !exists {
-			return false
-		}
-		return sym.isConst && sym.staticValue != nil
+		return exists && sym.isConst && sym.staticValue != nil
 	}
 	if expr.BinExpr != nil {
 		return g.isStatic(expr.BinExpr.Left) && g.isStatic(expr.BinExpr.Right)
@@ -203,15 +167,11 @@ func (g *Generator) foldExpression(expr ast.NodeExpression) (int, error) {
 		if !exists {
 			return 0, g.error(fmt.Sprintf("undeclared variable: %s", *expr.Ident), expr.Pos)
 		}
-		if sym.staticValue == nil {
-			return 0, g.error(fmt.Sprintf("variable is not statically known: %s", *expr.Ident), expr.Pos)
-		}
-		// Type assert the staticValue to *int
-		intVal, ok := sym.staticValue.(*int)
+		intValue, ok := sym.staticValue.(*int)
 		if !ok {
 			return 0, g.error(fmt.Sprintf("variable is not an integer constant: %s", *expr.Ident), expr.Pos)
 		}
-		return *intVal, nil
+		return *intValue, nil
 	}
 	if expr.BinExpr != nil {
 		return g.foldBinExpr(expr.BinExpr)

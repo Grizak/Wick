@@ -69,10 +69,10 @@ func validateTarget(host, target string) error {
 }
 
 func prepareLLVM() error {
-	llvm.InitializeAllTargets()
-	llvm.InitializeAllTargetMCs()
-	llvm.InitializeAllAsmPrinters()
 	llvm.InitializeAllAsmParsers()
+	llvm.InitializeAllAsmPrinters()
+	llvm.InitializeAllTargetMCs()
+	llvm.InitializeAllTargets()
 	return nil
 }
 

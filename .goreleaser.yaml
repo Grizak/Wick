@@ -12,38 +12,41 @@ builds:
   - id: linux-amd64
     main: ./src/cmd/wick
     binary: wick
-    goos:
-      - linux
-    goarch:
-      - amd64
+    goos: [linux]
+    goarch: [amd64]
+    tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
+      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/linux_amd64
+      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/linux_amd64/libLLVM.a
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
 
-  # - id: linux-arm64
-  #   main: ./src/cmd/wick
-  #   binary: wick
-  #   goos:
-  #     - linux
-  #   goarch:
-  #     - arm64
-  #   env:
-  #     - CGO_ENABLED=1
-  #   ldflags:
-  #     - "-s -w"
-  #     - "-X main.version={{ .Version }}"
+  - id: linux-arm64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [linux]
+    goarch: [arm64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/linux_arm64
+      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/linux_arm64/libLLVM.a
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
 
   - id: darwin-arm64
     main: ./src/cmd/wick
     binary: wick
-    goos:
-      - darwin
-    goarch:
-      - arm64
+    goos: [darwin]
+    goarch: [arm64]
+    tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
+      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/darwin_arm64
+      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/darwin_arm64/libLLVM.a
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -51,28 +54,30 @@ builds:
   - id: windows-amd64
     main: ./src/cmd/wick
     binary: wick
-    goos:
-      - windows
-    goarch:
-      - amd64
+    goos: [windows]
+    goarch: [amd64]
+    tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
+      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/windows_amd64
+      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
 
-  # - id: windows-arm64
-  #   main: ./src/cmd/wick
-  #   binary: wick
-  #   goos:
-  #     - windows
-  #   goarch:
-  #     - arm64
-  #   env:
-  #     - CGO_ENABLED=1
-  #   ldflags:
-  #     - "-s -w"
-  #     - "-X main.version={{ .Version }}"
+  - id: windows-arm64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [windows]
+    goarch: [arm64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/windows_arm64
+      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
 
 archives:
   - id: unix-archives
@@ -84,9 +89,6 @@ archives:
       - tar.gz
     files:
       - LICENSE
-      # Add other runtime files here if needed:
-      # - README.md
-      # - src/internal/assets/**
 
   - id: windows-archives
     ids:
@@ -103,19 +105,15 @@ nfpms:
     ids:
       - linux-amd64
       - linux-arm64
-
     formats:
       - deb
       - rpm
       - archlinux
-
     bindir: /usr/bin
-
     maintainer: "Isak Grönlund <gronlundisak11@gmail.com> (https://isaksweb.xyz)"
     description: "WICK Programming Language - A simple and efficient programming language for modern development."
     homepage: "https://github.com/Grizak/Wick"
     license: "MIT"
-
     contents:
       - src: LICENSE
         dst: /usr/share/doc/wick/LICENSE

@@ -5,84 +5,81 @@ import (
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/types"
+	"tinygo.org/x/go-llvm"
 )
 
-func (g *Generator) generateCondition(expr ast.NodeExpression) (string, error) {
-	// If it's a bool literal
-	if expr.BoolLit != nil {
-		if *expr.BoolLit {
-			return "1", nil
-		}
-		return "0", nil
-	}
-
-	// If it's a comparison expression
+func (g *Generator) generateCondition(expr ast.NodeExpression) (llvm.Value, error) {
 	if expr.BinExpr != nil {
 		leftType, err := g.typeChecker.InferType(&expr.BinExpr.Left)
 		if err != nil {
-			return "", g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("cannot infer left operand type: %v", err), expr.BinExpr.Pos)
+		}
+		rightType, err := g.typeChecker.InferType(&expr.BinExpr.Right)
+		if err != nil {
+			return llvm.Value{}, g.error(fmt.Sprintf("cannot infer right operand type: %v", err), expr.BinExpr.Pos)
 		}
 
 		left, err := g.generateExpression(expr.BinExpr.Left)
 		if err != nil {
-			return "", err
+			return llvm.Value{}, err
 		}
 		right, err := g.generateExpression(expr.BinExpr.Right)
 		if err != nil {
-			return "", err
+			return llvm.Value{}, err
 		}
-
-		result := g.tmpVar()
-		isFloat := isFloatType(leftType)
+		operandType := g.commonNumericType(leftType, rightType)
+		isFloat := isFloatType(operandType)
+		left, err = g.coerceValue(left, leftType, operandType, g.newValueName("promote"))
+		if err != nil {
+			return llvm.Value{}, g.error(err.Error(), expr.BinExpr.Pos)
+		}
+		right, err = g.coerceValue(right, rightType, operandType, g.newValueName("promote"))
+		if err != nil {
+			return llvm.Value{}, g.error(err.Error(), expr.BinExpr.Pos)
+		}
 
 		switch expr.BinExpr.Op {
 		case types.BinOpEq:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp oeq double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp eq i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatOEQ, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntEQ, left, right, g.newValueName("icmp")), nil
 		case types.BinOpNotEq:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp one double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp ne i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatONE, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntNE, left, right, g.newValueName("icmp")), nil
 		case types.BinOpLt:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp olt double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp slt i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatOLT, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntSLT, left, right, g.newValueName("icmp")), nil
 		case types.BinOpGt:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp ogt double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp sgt i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatOGT, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntSGT, left, right, g.newValueName("icmp")), nil
 		case types.BinOpLtEq:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp ole double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp sle i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatOLE, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntSLE, left, right, g.newValueName("icmp")), nil
 		case types.BinOpGtEq:
 			if isFloat {
-				g.writeLine(fmt.Sprintf("    %s = fcmp oge double %s, %s", result, left, right))
-			} else {
-				g.writeLine(fmt.Sprintf("    %s = icmp sge i64 %s, %s", result, left, right))
+				return g.builder.CreateFCmp(llvm.FloatOGE, left, right, g.newValueName("fcmp")), nil
 			}
+			return g.builder.CreateICmp(llvm.IntSGE, left, right, g.newValueName("icmp")), nil
 		default:
-			return "", g.error(fmt.Sprintf("not a comparison operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
+			return llvm.Value{}, g.error(fmt.Sprintf("not a comparison operator: %s", expr.BinExpr.Op), expr.BinExpr.Pos)
 		}
-
-		return result, nil
 	}
 
-	// If it's an ident of bool type
-	if expr.Ident != nil {
-		return g.generateExpression(expr)
+	if expr.BoolLit != nil || expr.Ident != nil {
+		value, err := g.generateExpression(expr)
+		if err != nil {
+			return llvm.Value{}, err
+		}
+		return value, nil
 	}
-
-	return "", g.error("expected a boolean expression", expr.Pos)
+	return llvm.Value{}, g.error("expected a boolean expression", expr.Pos)
 }
