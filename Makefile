@@ -21,6 +21,7 @@ dev:
 	CC=gcc CXX=g++ \
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="-I$(LLVM_INCLUDE)" \
+	CGO_CXXFLAGS="-I$(LLVM_INCLUDE)" \
 	CGO_LDFLAGS="$(LLVM_LIB)" \
 	go build -tags "byollvm llvm20" -ldflags "-X main.version=dev" -o "$(DEV_OUT)" ./src/cmd/wick
 
