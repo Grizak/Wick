@@ -127,7 +127,7 @@ exit(x + 1)
 
 ## Building from Source
 
-Requires Go 1.21+.
+Requires Go 1.26.2+.
 
 ```bash
 git clone https://github.com/Grizak/Wick
@@ -135,7 +135,7 @@ cd Wick
 make
 ```
 
-The compiler binary will be at `build/wick`.
+The compiler binary will be at `dist/wick`.
 
 ## Roadmap
 
