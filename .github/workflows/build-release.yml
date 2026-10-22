@@ -48,7 +48,15 @@ jobs:
           path: repo-packages/
 
   build-windows:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            msvc_arch: amd64
+          - arch: arm64
+            msvc_arch: amd64_arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,51 +64,43 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install Zig
-        uses: mlugg/setup-zig@v1
-        with:
-          version: 0.13.0
-      - name: Configure Windows cross-compilers
+      - name: Prepare build assets
+        shell: pwsh
         run: |
-          mkdir -p /tmp/zig-wrappers
-          cat > /tmp/zig-wrappers/x86_64-windows-gnu-cc <<'EOF'
-          #!/bin/sh
-          exec zig cc -target x86_64-windows-gnu "$@"
-          EOF
-          cat > /tmp/zig-wrappers/x86_64-windows-gnu-c++ <<'EOF'
-          #!/bin/sh
-          exec zig c++ -target x86_64-windows-gnu -stdlib=libstdc++ "$@"
-          EOF
-          cat > /tmp/zig-wrappers/aarch64-windows-gnu-cc <<'EOF'
-          #!/bin/sh
-          exec zig cc -target aarch64-windows-gnu "$@"
-          EOF
-          cat > /tmp/zig-wrappers/aarch64-windows-gnu-c++ <<'EOF'
-          #!/bin/sh
-          exec zig c++ -target aarch64-windows-gnu -stdlib=libstdc++ "$@"
-          EOF
-          chmod +x /tmp/zig-wrappers/*
+          New-Item -ItemType Directory -Force src/internal/assets | Out-Null
+          Copy-Item LICENSE src/internal/assets/LICENSE -Force
+          go mod tidy
+      - name: Configure Visual Studio toolchain
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+      - name: Install Clang
+        shell: pwsh
+        run: |
+          choco install llvm --yes --no-progress
+          "$env:ProgramFiles\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
         with:
-          args: release --clean --skip=publish --config .goreleaser.windows.yaml
+          args: release --clean --skip=publish --config .goreleaser.windows-${{ matrix.arch }}.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Build Windows snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
         with:
-          args: release --clean --snapshot --skip=publish --config .goreleaser.windows.yaml
+          args: release --clean --snapshot --skip=publish --config .goreleaser.windows-${{ matrix.arch }}.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Stage release assets
+        shell: pwsh
         run: |
-          mkdir -p release-assets
-          find dist -maxdepth 1 -type f -name '*.zip' -exec cp {} release-assets/ \;
+          New-Item -ItemType Directory -Force release-assets | Out-Null
+          Copy-Item dist/*.zip release-assets/
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-release-windows
+          name: dist-release-windows-${{ matrix.arch }}
           path: release-assets/
 
   build-darwin:
