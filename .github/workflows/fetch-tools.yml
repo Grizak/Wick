@@ -80,7 +80,7 @@ jobs:
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
             -DCMAKE_EXE_LINKER_FLAGS="-static"
-          ninja -C build lld
+          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -100,7 +100,7 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-          ninja -C build lld
+          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Copy headers
         run: |
@@ -133,6 +133,10 @@ jobs:
             echo "END"
           } | ar -M
           ranlib "$OUT/libLLVM.a"
+          for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
+            nm -g --defined-only "$OUT/libLLVM.a" |
+              grep -q " $symbol$" || { echo "missing LLVM symbol: $symbol" >&2; exit 1; }
+          done
 
       - name: Create static LLVM archive (macOS)
         if: runner.os == 'macOS'
@@ -140,6 +144,10 @@ jobs:
           OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
           mkdir -p "$OUT"
           libtool -static -o "$OUT/libLLVM.a" llvm-project/build/lib/*.a
+          for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
+            nm -g "$OUT/libLLVM.a" |
+              grep -Eq " T _?$symbol$" || { echo "missing LLVM symbol: $symbol" >&2; exit 1; }
+          done
 
       - name: Prepare binaries
         run: |
@@ -292,6 +300,12 @@ jobs:
         run: |
           Test-Path src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
           Test-Path src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
+          $symbols = llvm-nm --defined-only src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
+          foreach ($symbol in @("LLVMAddGlobalMapping", "LLVMCreateExecutionEngineForModule", "LLVMLinkInInterpreter", "LLVMLinkInMCJIT")) {
+            if (-not ($symbols -match $symbol)) {
+              throw "Missing LLVM symbol: $symbol"
+            }
+          }
 
       - name: Strip binaries
         shell: pwsh
@@ -450,6 +464,12 @@ jobs:
         run: |
           Test-Path src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
           Test-Path src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+          $symbols = llvm-nm --defined-only src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+          foreach ($symbol in @("LLVMAddGlobalMapping", "LLVMCreateExecutionEngineForModule", "LLVMLinkInInterpreter", "LLVMLinkInMCJIT")) {
+            if (-not ($symbols -match $symbol)) {
+              throw "Missing LLVM symbol: $symbol"
+            }
+          }
 
       - name: Strip binaries
         shell: pwsh
@@ -488,14 +508,16 @@ jobs:
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
           lfs: false
+
       - name: Configure Forgejo credentials for LFS
         run: |
           umask 077
           printf 'machine git-lfs.isaksweb.xyz\nlogin %s\npassword %s\n' \
-            "${{ secrets.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
+            "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
 
       - name: Setup git
         run: |
+          git config credential.helper "netrc -f ~/.netrc"
           git lfs install --local
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
