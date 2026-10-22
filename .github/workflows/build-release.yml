@@ -67,8 +67,8 @@ jobs:
       - name: Prepare build assets
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force src/internal/assets | Out-Null
-          Copy-Item LICENSE src/internal/assets/LICENSE -Force
+          New-Item -ItemType Directory -Force src\internal\assets | Out-Null
+          Copy-Item LICENSE src\internal\assets\LICENSE -Force
           go mod tidy
       - name: Configure Visual Studio toolchain
         uses: ilammy/msvc-dev-cmd@v1
@@ -97,11 +97,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release-assets | Out-Null
-          Copy-Item dist/*.zip release-assets/
+          Copy-Item dist\*.zip release-assets\ -Force
       - uses: actions/upload-artifact@v4
         with:
           name: dist-release-windows-${{ matrix.arch }}
-          path: release-assets/
+          path: release-assets\
 
   build-darwin:
     runs-on: macos-latest
