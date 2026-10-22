@@ -512,7 +512,7 @@ jobs:
       - name: Configure Forgejo credentials for LFS
         run: |
           umask 077
-          printf 'machine git-lfs.isaksweb.xyz\nlogin %s\npassword %s\n' \
+          printf 'machine git.isaksweb.xyz\nlogin %s\npassword %s\n' \
             "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
 
       - name: Setup git
