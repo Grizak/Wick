@@ -1,11 +1,9 @@
 version: 2
-
 project_name: wick
-
 before:
   hooks:
-    - mkdir -p src/internal/assets
-    - cp LICENSE src/internal/assets/LICENSE
+    - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets
+    - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
     - go mod tidy
 
 builds:
@@ -17,8 +15,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/linux_amd64
-      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/linux_amd64/libLLVM.a
+      - CC=gcc
+      - CXX=g++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_amd64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -31,8 +32,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/linux_arm64
-      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/linux_arm64/libLLVM.a
+      - CC=aarch64-linux-gnu-gcc
+      - CXX=aarch64-linux-gnu-g++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_arm64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -45,8 +49,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/darwin_arm64
-      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/darwin_arm64/libLLVM.a
+      - CC=clang
+      - CXX=clang++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/darwin_arm64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/darwin_arm64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/darwin_arm64/libLLVM.a
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -59,8 +66,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/windows_amd64
-      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
+      - CC=/tmp/zig-wrappers/x86_64-windows-gnu-cc
+      - CXX=/tmp/zig-wrappers/x86_64-windows-gnu-c++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -73,8 +83,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-Isrc/internal/llvm/toolchain/include/windows_arm64
-      - CGO_LDFLAGS=src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+      - CC=/tmp/zig-wrappers/aarch64-windows-gnu-cc
+      - CXX=/tmp/zig-wrappers/aarch64-windows-gnu-c++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -98,7 +111,6 @@ archives:
       - zip
     files:
       - LICENSE
-
 nfpms:
   - id: linux-packages
     package_name: wick
@@ -119,13 +131,10 @@ nfpms:
         dst: /usr/share/doc/wick/LICENSE
         file_info:
           mode: 0644
-
 checksum:
   name_template: "checksums.txt"
-
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
-
 changelog:
   sort: asc
   filters:

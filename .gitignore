@@ -7,3 +7,6 @@ notes/*
 
 node_modules
 project.zip
+
+# A file that goreleaser creates when building a release and it's really annoying
+-.o

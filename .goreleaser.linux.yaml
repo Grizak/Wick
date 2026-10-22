@@ -1,0 +1,84 @@
+version: 2
+project_name: wick
+before:
+  hooks:
+    - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets
+    - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
+    - go mod tidy
+
+builds:
+  - id: linux-amd64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [linux]
+    goarch: [amd64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CC=gcc
+      - CXX=g++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_amd64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+  - id: linux-arm64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [linux]
+    goarch: [arm64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+      - CXX=aarch64-linux-gnu-g++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_arm64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+archives:
+  - id: linux-archives
+    ids:
+      - linux-amd64
+      - linux-arm64
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+
+nfpms:
+  - id: linux-packages
+    package_name: wick
+    ids:
+      - linux-amd64
+      - linux-arm64
+    formats:
+      - deb
+      - rpm
+      - archlinux
+    bindir: /usr/bin
+    maintainer: "Isak Grönlund <gronlundisak11@gmail.com> (https://isaksweb.xyz)"
+    description: "WICK Programming Language - A simple and efficient programming language for modern development."
+    homepage: "https://github.com/Grizak/Wick"
+    license: "MIT"
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/wick/LICENSE
+        file_info:
+          mode: 0644
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge pull request"
+      - "^Merge branch"
+      - "^docs:"
+      - "^test:"

@@ -1,0 +1,63 @@
+version: 2
+project_name: wick
+before:
+  hooks:
+    - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets
+    - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
+    - go mod tidy
+
+builds:
+  - id: windows-amd64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [windows]
+    goarch: [amd64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CC=/tmp/zig-wrappers/x86_64-windows-gnu-cc
+      - CXX=/tmp/zig-wrappers/x86_64-windows-gnu-c++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+  - id: windows-arm64
+    main: ./src/cmd/wick
+    binary: wick
+    goos: [windows]
+    goarch: [arm64]
+    tags: [byollvm, llvm20]
+    env:
+      - CGO_ENABLED=1
+      - CC=/tmp/zig-wrappers/aarch64-windows-gnu-cc
+      - CXX=/tmp/zig-wrappers/aarch64-windows-gnu-c++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
+    ldflags:
+      - "-s -w"
+      - "-X main.version={{ .Version }}"
+
+archives:
+  - id: windows-archives
+    ids:
+      - windows-amd64
+      - windows-arm64
+    formats:
+      - zip
+    files:
+      - LICENSE
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge pull request"
+      - "^Merge branch"
+      - "^docs:"
+      - "^test:"
