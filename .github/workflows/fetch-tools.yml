@@ -508,14 +508,16 @@ jobs:
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
           lfs: false
+
       - name: Configure Forgejo credentials for LFS
         run: |
           umask 077
           printf 'machine git-lfs.isaksweb.xyz\nlogin %s\npassword %s\n' \
-            "${{ secrets.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
+            "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
 
       - name: Setup git
         run: |
+          git config credential.helper "netrc -f ~/.netrc"
           git lfs install --local
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
