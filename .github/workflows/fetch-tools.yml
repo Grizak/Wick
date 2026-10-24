@@ -408,7 +408,7 @@ jobs:
 
       - name: Copy headers
         run: |
-          $platform = "windows_amd64"
+          $platform = "windows_arm64"
           $root = "src/internal/llvm/toolchain/include/$platform"
 
           New-Item -ItemType Directory -Force "$root/llvm", "$root/llvm-c" |
