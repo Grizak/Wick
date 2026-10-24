@@ -206,11 +206,6 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-binutils
 
-      - name: Pull LFS objects
-        run: |
-          git lfs install --local
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
-
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_amd64 src/internal/llvm/toolchain/lib/windows_amd64
 
@@ -319,16 +314,10 @@ jobs:
           update: false
           install: >-
             git
-            git-lfs
             mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-cmake
             mingw-w64-clang-aarch64-ninja
             mingw-w64-clang-aarch64-binutils
-
-      - name: Pull LFS objects
-        run: |
-          git lfs install --local
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
 
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_arm64 src/internal/llvm/toolchain/lib/windows_arm64
