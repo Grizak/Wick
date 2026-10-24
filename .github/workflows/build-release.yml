@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/linux_amd64/*,src/internal/llvm/toolchain/bin/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_arm64/*"
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/linux_amd64/*,src/internal/llvm/toolchain/bin/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_amd64/*,src/internal/llvm/toolchain/lib/linux_arm64/*"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
