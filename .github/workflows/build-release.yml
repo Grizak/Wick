@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/linux_amd64/*,src/internal/llvm/toolchain/bin/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_arm64/*"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -66,7 +66,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_${{ matrix.arch }}/*,src/internal/llvm/toolchain/lib/windows_${{ matrix.arch }}/*"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -117,7 +117,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
