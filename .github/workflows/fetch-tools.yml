@@ -185,148 +185,117 @@ jobs:
 
   fetch-windows-amd64:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - name: Setup MSYS2 (MinGW-w64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-binutils
+
+      - name: Pull LFS objects
+        run: |
+          git lfs install --local
+          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
 
       - name: Cleanup
-        shell: pwsh
-        run: |
-          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
-            src/internal/llvm/toolchain/bin/windows_amd64, `
-            src/internal/llvm/toolchain/lib/windows_amd64
-
-      - name: Install LLVM
-        shell: pwsh
-        run: |
-          choco install llvm -y
-
-          $llvmBin = "C:\Program Files\LLVM\bin"
-          echo "$llvmBin" >> $env:GITHUB_PATH
-
-      - name: Setup Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
-
-      - name: Get LLVM version
-        id: llvm-version
-        shell: pwsh
-        env:
-          LLVM_VERSION: ${{ env.LLVM_VERSION }}
-        run: |
-          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
+        run: rm -rf src/internal/llvm/toolchain/bin/windows_amd64 src/internal/llvm/toolchain/lib/windows_amd64
 
       - name: Clone LLVM
-        shell: pwsh
         run: |
-          git clone `
-            --depth 1 `
-            --branch llvmorg-${{ steps.llvm-version.outputs.version }} `
-            https://github.com/llvm/llvm-project.git
+          git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
         uses: actions/cache@v5
         with:
           path: llvm-project/build
-          key: llvm-build-windows-amd64-${{ steps.llvm-version.outputs.version }}
+          key: llvm-build-windows-amd64-mingw-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
-        shell: pwsh
         run: |
-          cmake `
-            -S llvm-project/llvm `
-            -B llvm-project/build `
-            -G Ninja `
-            -DCMAKE_BUILD_TYPE=MinSizeRel `
-            -DCMAKE_C_COMPILER=clang `
-            -DCMAKE_CXX_COMPILER=clang++ `
-            -DCMAKE_ASM_COMPILER=clang `
-            -DLLVM_BUILD_STATIC=ON `
-            -DLLVM_BUILD_TOOLS=OFF `
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
-            -DLLVM_ENABLE_PROJECTS="lld" `
-            -DBUILD_SHARED_LIBS=OFF `
-            -DLLVM_ENABLE_TERMINFO=OFF `
-            -DLLVM_ENABLE_ZLIB=OFF `
+          cmake -S llvm-project/llvm -B llvm-project/build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-
           cmake --build llvm-project/build
 
       - name: Copy headers
         run: |
-          $platform = "windows_amd64"
-          $root = "src/internal/llvm/toolchain/include/$platform"
-
-          New-Item -ItemType Directory -Force "$root/llvm", "$root/llvm-c" |
-            Out-Null
-
-          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm/*" "$root/llvm/"
-          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm-c/*" "$root/llvm-c/"
-
-          if (Test-Path "llvm-project/build/include/llvm") {
-            Copy-Item -Recurse -Force "llvm-project/build/include/llvm/*" "$root/llvm/"
-          }
+          root=src/internal/llvm/toolchain/include/windows_amd64
+          mkdir -p "$root/llvm" "$root/llvm-c"
+          cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
+          cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          if [ -d llvm-project/build/include/llvm ]; then
+            cp -r llvm-project/build/include/llvm/. "$root/llvm/"
+          fi
 
       - name: Create static LLVM archive
-        shell: pwsh
         run: |
-          $out = "src/internal/llvm/toolchain/lib/windows_amd64"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
-
-          $libs = Get-ChildItem llvm-project/build/lib/*.lib | ForEach-Object { $_.FullName }
-          llvm-lib /OUT:"$out\LLVM.lib" $libs
+          out=src/internal/llvm/toolchain/lib/windows_amd64
+          mkdir -p "$out"
+          {
+            echo "CREATE $out/libLLVM.a"
+            for lib in llvm-project/build/lib/*.a; do echo "ADDLIB $lib"; done
+            echo "SAVE"
+            echo "END"
+          } > llvm.mri
+          ar -M < llvm.mri
+          ranlib "$out/libLLVM.a"
 
       - name: Prepare binaries
-        shell: pwsh
         run: |
-          $out = "src/internal/llvm/toolchain/bin/windows_amd64"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          out=src/internal/llvm/toolchain/bin/windows_amd64
+          mkdir -p "$out"
+          cp llvm-project/build/bin/lld-link.exe "$out/"
 
-          Copy-Item llvm-project/build/bin/lld-link.exe $out
-
-      - name: Copy kernel32.lib
-        shell: pwsh
-        run: |
-          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Lib" |
-            Sort-Object Name -Descending |
-            Select-Object -First 1
-
-          Copy-Item `
-            "$($sdk.FullName)\um\x64\kernel32.lib" `
-            src/internal/llvm/toolchain/bin/windows_amd64/kernel32.lib
+          # Wick's output linker needs the MSVC-format kernel32.lib from the SDK
+          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/Lib"/*/ | sort -V | tail -n1)
+          cp "${sdk}um/x64/kernel32.lib" "$out/kernel32.lib"
 
       - name: Verify outputs
-        shell: pwsh
         run: |
-          Test-Path src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          Test-Path src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
-          $symbols = llvm-nm --defined-only src/internal/llvm/toolchain/lib/windows_amd64/LLVM.lib
-          foreach ($symbol in @("LLVMAddGlobalMapping", "LLVMCreateExecutionEngineForModule", "LLVMLinkInInterpreter", "LLVMLinkInMCJIT")) {
-            if (-not ($symbols -match $symbol)) {
-              throw "Missing LLVM symbol: $symbol"
-            }
-          }
+          test -f src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+          test -f src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a
+          symbols=$(nm --defined-only src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a)
+          for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
+            echo "$symbols" | grep -q " T $symbol\$" || { echo "Missing LLVM symbol: $symbol"; exit 1; }
+          done
 
       - name: Strip binaries
-        shell: pwsh
-        run: llvm-strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
+        run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
 
       - name: Write versions
-        shell: pwsh
         run: |
-          $bin = "src/internal/llvm/toolchain/bin/windows_amd64"
-
-          $lld = (& "$bin\lld-link.exe" --version |
-            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
-
-          @{
-            lld = $lld
-          } | ConvertTo-Json -Compress |
-            Set-Content "$bin\versions.json"
+          bin=src/internal/llvm/toolchain/bin/windows_amd64
+          lld=$("$bin/lld-link.exe" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
+          printf '{"lld":"%s"}\n' "$lld" > "$bin/versions.json"
 
       - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
+          if-no-files-found: error
           path: |
             src/internal/llvm/toolchain/bin/windows_amd64/
             src/internal/llvm/toolchain/lib/windows_amd64/
@@ -334,163 +303,121 @@ jobs:
 
   fetch-windows-arm64:
     runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - name: Setup MSYS2 (CLANGARM64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: false
+          install: >-
+            git
+            git-lfs
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-cmake
+            mingw-w64-clang-aarch64-ninja
+            mingw-w64-clang-aarch64-binutils
+
+      - name: Pull LFS objects
+        run: |
+          git lfs install --local
+          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
 
       - name: Cleanup
-        shell: pwsh
-        run: |
-          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
-            src/internal/llvm/toolchain/bin/windows_arm64, `
-            src/internal/llvm/toolchain/lib/windows_arm64
-
-      # Native ARM64 MSVC environment. The Chocolatey LLVM package is x64
-      # only, so the LLVM build itself uses cl.exe rather than clang.
-      - name: Setup MSVC (ARM64)
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: arm64
-
-      # llvm-lib and llvm-strip are host-independent tools; the x64 build
-      # runs under emulation on Windows ARM and only handles archiving here.
-      - name: Install tools
-        shell: pwsh
-        run: |
-          choco install llvm cmake ninja -y
-
-          $llvmBin = "C:\Program Files\LLVM\bin"
-          echo "$llvmBin" >> $env:GITHUB_PATH
-
-      - name: Get LLVM version
-        id: llvm-version
-        shell: pwsh
-        env:
-          LLVM_VERSION: ${{ env.LLVM_VERSION }}
-        run: |
-          "version=${{ env.LLVM_VERSION }}" >> $env:GITHUB_OUTPUT
+        run: rm -rf src/internal/llvm/toolchain/bin/windows_arm64 src/internal/llvm/toolchain/lib/windows_arm64
 
       - name: Clone LLVM
-        shell: pwsh
         run: |
-          git clone `
-            --depth 1 `
-            --branch llvmorg-${{ steps.llvm-version.outputs.version }} `
-            https://github.com/llvm/llvm-project.git
+          git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
 
       - name: Cache LLVM build
         id: cache-llvm-build
         uses: actions/cache@v5
         with:
           path: llvm-project/build
-          key: llvm-build-windows_arm64-${{ steps.llvm-version.outputs.version }}
+          key: llvm-build-windows-arm64-mingw-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
-        shell: pwsh
         run: |
-          cmake `
-            -S llvm-project/llvm `
-            -B llvm-project/build `
-            -G Ninja `
-            -DCMAKE_BUILD_TYPE=MinSizeRel `
-            -DCMAKE_C_COMPILER=cl `
-            -DCMAKE_CXX_COMPILER=cl `
-            -DLLVM_BUILD_STATIC=ON `
-            -DLLVM_BUILD_TOOLS=OFF `
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
-            -DLLVM_ENABLE_PROJECTS="lld" `
-            -DBUILD_SHARED_LIBS=OFF `
-            -DLLVM_ENABLE_TERMINFO=OFF `
-            -DLLVM_ENABLE_ZLIB=OFF `
+          cmake -S llvm-project/llvm -B llvm-project/build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF
-
           cmake --build llvm-project/build
 
       - name: Copy headers
         run: |
-          $platform = "windows_arm64"
-          $root = "src/internal/llvm/toolchain/include/$platform"
-
-          New-Item -ItemType Directory -Force "$root/llvm", "$root/llvm-c" |
-            Out-Null
-
-          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm/*" "$root/llvm/"
-          Copy-Item -Recurse -Force "llvm-project/llvm/include/llvm-c/*" "$root/llvm-c/"
-
-          if (Test-Path "llvm-project/build/include/llvm") {
-            Copy-Item -Recurse -Force "llvm-project/build/include/llvm/*" "$root/llvm/"
-          }
+          root=src/internal/llvm/toolchain/include/windows_arm64
+          mkdir -p "$root/llvm" "$root/llvm-c"
+          cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
+          cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          if [ -d llvm-project/build/include/llvm ]; then
+            cp -r llvm-project/build/include/llvm/. "$root/llvm/"
+          fi
 
       - name: Create static LLVM archive
-        shell: pwsh
         run: |
-          $out = "src/internal/llvm/toolchain/lib/windows_arm64"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
-
-          $libs = Get-ChildItem llvm-project/build/lib/*.lib | ForEach-Object { $_.FullName }
-          llvm-lib /OUT:"$out\LLVM.lib" $libs
+          out=src/internal/llvm/toolchain/lib/windows_arm64
+          mkdir -p "$out"
+          {
+            echo "CREATE $out/libLLVM.a"
+            for lib in llvm-project/build/lib/*.a; do echo "ADDLIB $lib"; done
+            echo "SAVE"
+            echo "END"
+          } > llvm.mri
+          ar -M < llvm.mri
+          ranlib "$out/libLLVM.a"
 
       - name: Prepare binaries
-        shell: pwsh
         run: |
-          $out = "src/internal/llvm/toolchain/bin/windows_arm64"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          out=src/internal/llvm/toolchain/bin/windows_arm64
+          mkdir -p "$out"
+          cp llvm-project/build/bin/lld-link.exe "$out/"
 
-          Copy-Item llvm-project/build/bin/lld-link.exe $out
-
-      - name: Copy kernel32.lib
-        shell: pwsh
-        run: |
-          $libRoot = "C:\Program Files (x86)\Windows Kits\10\Lib"
-
-          $kernel32 = Get-ChildItem $libRoot -Directory |
-            Where-Object { $_.Name -match '^\d+(\.\d+){1,3}$' } |
-            Sort-Object { [version]$_.Name } -Descending |
-            ForEach-Object {
-              $candidate = Join-Path $_.FullName 'um\arm64\kernel32.lib'
-              if (Test-Path $candidate) { $candidate }
-            } |
-            Select-Object -First 1
-
-          if (-not $kernel32) {
-            throw "No ARM64 kernel32.lib found under $libRoot"
-          }
-
-          $destination = 'src/internal/llvm/toolchain/bin/windows_arm64/kernel32.lib'
-          Copy-Item -LiteralPath $kernel32 -Destination $destination -Force
+          # Wick's output linker needs the MSVC-format kernel32.lib from the SDK (ARM64 variant)
+          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/Lib"/*/ | sort -V | tail -n1)
+          if [ ! -f "${sdk}um/arm64/kernel32.lib" ]; then
+            echo "No ARM64 kernel32.lib under ${sdk}um/arm64"; exit 1
+          fi
+          cp "${sdk}um/arm64/kernel32.lib" "$out/kernel32.lib"
 
       - name: Verify outputs
-        shell: pwsh
         run: |
-          Test-Path src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
-          Test-Path src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
-          $symbols = llvm-nm --defined-only src/internal/llvm/toolchain/lib/windows_arm64/LLVM.lib
-          foreach ($symbol in @("LLVMAddGlobalMapping", "LLVMCreateExecutionEngineForModule", "LLVMLinkInInterpreter", "LLVMLinkInMCJIT")) {
-            if (-not ($symbols -match $symbol)) {
-              throw "Missing LLVM symbol: $symbol"
-            }
-          }
+          test -f src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
+          test -f src/internal/llvm/toolchain/lib/windows_arm64/libLLVM.a
+          symbols=$(nm --defined-only src/internal/llvm/toolchain/lib/windows_arm64/libLLVM.a)
+          for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
+            echo "$symbols" | grep -q " T $symbol\$" || { echo "Missing LLVM symbol: $symbol"; exit 1; }
+          done
 
       - name: Strip binaries
-        shell: pwsh
-        run: llvm-strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
+        run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
 
       - name: Write versions
-        shell: pwsh
         run: |
-          $bin = "src/internal/llvm/toolchain/bin/windows_arm64"
-
-          $lld = (& "$bin\lld-link.exe" --version |
-            Select-String '\d+\.\d+(\.\d+)?').Matches[0].Value
-
-          @{
-            lld = $lld
-          } | ConvertTo-Json -Compress |
-            Set-Content "$bin\versions.json"
+          bin=src/internal/llvm/toolchain/bin/windows_arm64
+          lld=$("$bin/lld-link.exe" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
+          printf '{"lld":"%s"}\n' "$lld" > "$bin/versions.json"
 
       - uses: actions/upload-artifact@v6
         with:
           name: windows-arm64-tools
+          if-no-files-found: error
           path: |
             src/internal/llvm/toolchain/bin/windows_arm64/
             src/internal/llvm/toolchain/lib/windows_arm64/
