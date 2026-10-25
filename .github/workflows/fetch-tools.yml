@@ -251,21 +251,22 @@ jobs:
           out=src/internal/llvm/toolchain/lib/windows_amd64
           mkdir -p "$out"
 
-          work="$PWD/llvm-objs"
-          rm -rf "$work" && mkdir -p "$work"
+          work=llvm-objs
+          rm -rf "$work"
+          mkdir -p "$work/tmp"
 
-          for lib in "$PWD"/llvm-project/build/lib/*.a; do
+          for lib in llvm-project/build/lib/*.a; do
             name=$(basename "$lib" .a)
-            tmp=$(mktemp -d)
-            (cd "$tmp" && ar x "$lib")
-            for o in "$tmp"/*.o; do
+            rm -rf "$work/tmp" && mkdir -p "$work/tmp"
+            (cd "$work/tmp" && ar x "../../$lib")
+            for o in "$work"/tmp/*.o; do
               [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
             done
-            rm -rf "$tmp"
           done
+          rm -rf "$work/tmp"
 
           {
-            echo "CREATE $PWD/$out/libLLVM.a"
+            echo "CREATE $out/libLLVM.a"
             for o in "$work"/*.o; do echo "ADDMOD $o"; done
             echo "SAVE"
             echo "END"
@@ -381,21 +382,22 @@ jobs:
           out=src/internal/llvm/toolchain/lib/windows_arm64
           mkdir -p "$out"
 
-          work="$PWD/llvm-objs"
-          rm -rf "$work" && mkdir -p "$work"
+          work=llvm-objs
+          rm -rf "$work"
+          mkdir -p "$work/tmp"
 
-          for lib in "$PWD"/llvm-project/build/lib/*.a; do
+          for lib in llvm-project/build/lib/*.a; do
             name=$(basename "$lib" .a)
-            tmp=$(mktemp -d)
-            (cd "$tmp" && ar x "$lib")
-            for o in "$tmp"/*.o; do
+            rm -rf "$work/tmp" && mkdir -p "$work/tmp"
+            (cd "$work/tmp" && ar x "../../$lib")
+            for o in "$work"/tmp/*.o; do
               [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
             done
-            rm -rf "$tmp"
           done
+          rm -rf "$work/tmp"
 
           {
-            echo "CREATE $PWD/$out/libLLVM.a"
+            echo "CREATE $out/libLLVM.a"
             for o in "$work"/*.o; do echo "ADDMOD $o"; done
             echo "SAVE"
             echo "END"
