@@ -249,25 +249,43 @@ jobs:
       - name: Create static LLVM archive
         run: |
           out=src/internal/llvm/toolchain/lib/windows_amd64
+          set -euo pipefail
           mkdir -p "$out"
 
-          work=llvm-objs
+          work="$PWD/llvm-objs"
           rm -rf "$work"
-          mkdir -p "$work/tmp"
+          mkdir -p "$work"
 
           for lib in llvm-project/build/lib/*.a; do
             name=$(basename "$lib" .a)
-            rm -rf "$work/tmp" && mkdir -p "$work/tmp"
-            (cd "$work/tmp" && ar x "../../$lib")
-            for o in "$work"/tmp/*.o; do
-              [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
-            done
+            tmp="$work/tmp"
+            rm -rf "$tmp"
+            mkdir -p "$tmp"
+
+            ar x "$PWD/$lib" --output="$tmp" 2>/dev/null || (cd "$tmp" && ar x "$PWD/$lib")
+
+            count=0
+            while IFS= read -r -d '' o; do
+              cp "$o" "$work/${name}__$(basename "$o")"
+              count=$((count + 1))
+            done < <(find "$tmp" -type f -name '*.o' -print0)
+
+            if [ "$count" -eq 0 ]; then
+              echo "No objects extracted from $lib"
+              ar t "$lib" | head -n 5
+              exit 1
+            fi
           done
           rm -rf "$work/tmp"
 
+          objs=$(find "$work" -maxdepth 1 -type f -name '*.o' | wc -l)
+          echo "Collected $objs objects"
+
           {
             echo "CREATE $out/libLLVM.a"
-            for o in "$work"/*.o; do echo "ADDMOD $o"; done
+            find "$work" -maxdepth 1 -type f -name '*.o' | sort | while IFS= read -r o; do
+              echo "ADDMOD $o"
+            done
             echo "SAVE"
             echo "END"
           } > llvm.mri
@@ -381,25 +399,43 @@ jobs:
       - name: Create static LLVM archive
         run: |
           out=src/internal/llvm/toolchain/lib/windows_arm64
+          set -euo pipefail
           mkdir -p "$out"
 
-          work=llvm-objs
+          work="$PWD/llvm-objs"
           rm -rf "$work"
-          mkdir -p "$work/tmp"
+          mkdir -p "$work"
 
           for lib in llvm-project/build/lib/*.a; do
             name=$(basename "$lib" .a)
-            rm -rf "$work/tmp" && mkdir -p "$work/tmp"
-            (cd "$work/tmp" && ar x "../../$lib")
-            for o in "$work"/tmp/*.o; do
-              [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
-            done
+            tmp="$work/tmp"
+            rm -rf "$tmp"
+            mkdir -p "$tmp"
+
+            ar x "$PWD/$lib" --output="$tmp" 2>/dev/null || (cd "$tmp" && ar x "$PWD/$lib")
+
+            count=0
+            while IFS= read -r -d '' o; do
+              cp "$o" "$work/${name}__$(basename "$o")"
+              count=$((count + 1))
+            done < <(find "$tmp" -type f -name '*.o' -print0)
+
+            if [ "$count" -eq 0 ]; then
+              echo "No objects extracted from $lib"
+              ar t "$lib" | head -n 5
+              exit 1
+            fi
           done
           rm -rf "$work/tmp"
 
+          objs=$(find "$work" -maxdepth 1 -type f -name '*.o' | wc -l)
+          echo "Collected $objs objects"
+
           {
             echo "CREATE $out/libLLVM.a"
-            for o in "$work"/*.o; do echo "ADDMOD $o"; done
+            find "$work" -maxdepth 1 -type f -name '*.o' | sort | while IFS= read -r o; do
+              echo "ADDMOD $o"
+            done
             echo "SAVE"
             echo "END"
           } > llvm.mri
