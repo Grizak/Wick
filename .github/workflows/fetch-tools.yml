@@ -250,14 +250,30 @@ jobs:
         run: |
           out=src/internal/llvm/toolchain/lib/windows_amd64
           mkdir -p "$out"
+
+          work="$PWD/llvm-objs"
+          rm -rf "$work" && mkdir -p "$work"
+
+          for lib in "$PWD"/llvm-project/build/lib/*.a; do
+            name=$(basename "$lib" .a)
+            tmp=$(mktemp -d)
+            (cd "$tmp" && ar x "$lib")
+            for o in "$tmp"/*.o; do
+              [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
+            done
+            rm -rf "$tmp"
+          done
+
           {
-            echo "CREATE $out/libLLVM.a"
-            for lib in llvm-project/build/lib/*.a; do echo "ADDLIB $lib"; done
+            echo "CREATE $PWD/$out/libLLVM.a"
+            for o in "$work"/*.o; do echo "ADDMOD $o"; done
             echo "SAVE"
             echo "END"
           } > llvm.mri
+
           ar -M < llvm.mri
           ranlib "$out/libLLVM.a"
+          echo "Archived $(ar t "$out/libLLVM.a" | wc -l) objects"
 
       - name: Prepare binaries
         run: |
@@ -363,14 +379,30 @@ jobs:
         run: |
           out=src/internal/llvm/toolchain/lib/windows_arm64
           mkdir -p "$out"
+
+          work="$PWD/llvm-objs"
+          rm -rf "$work" && mkdir -p "$work"
+
+          for lib in "$PWD"/llvm-project/build/lib/*.a; do
+            name=$(basename "$lib" .a)
+            tmp=$(mktemp -d)
+            (cd "$tmp" && ar x "$lib")
+            for o in "$tmp"/*.o; do
+              [ -e "$o" ] && cp "$o" "$work/${name}__$(basename "$o")"
+            done
+            rm -rf "$tmp"
+          done
+
           {
-            echo "CREATE $out/libLLVM.a"
-            for lib in llvm-project/build/lib/*.a; do echo "ADDLIB $lib"; done
+            echo "CREATE $PWD/$out/libLLVM.a"
+            for o in "$work"/*.o; do echo "ADDMOD $o"; done
             echo "SAVE"
             echo "END"
           } > llvm.mri
+
           ar -M < llvm.mri
           ranlib "$out/libLLVM.a"
+          echo "Archived $(ar t "$out/libLLVM.a" | wc -l) objects"
 
       - name: Prepare binaries
         run: |
