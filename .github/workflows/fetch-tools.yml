@@ -229,6 +229,8 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++ \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
@@ -299,21 +301,6 @@ jobs:
           ranlib "$out/libLLVM.a"
           echo "Archived $(ar t "$out/libLLVM.a" | wc -l) objects"
 
-      - name: Debug missing symbols
-        run: |
-          # 1. Is the symbol in the build output at all?
-          nm --defined-only llvm-project/build/lib/libLLVMExecutionEngine.a 2>/dev/null | grep -i 'LLVMAddGlobalMapping\|LLVMLinkIn'
-
-          # 2. Is the ExecutionEngine library present?
-          ls llvm-project/build/lib | grep -i execution
-
-          # 3. Which object file holds the binding code, and is it in the merged archive?
-          ar t llvm-project/build/lib/libLLVMExecutionEngine.a | grep -i binding
-          ar t src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a | grep -i binding
-
-          # 4. What nm type letter does the symbol actually get?
-          nm -A src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a | grep -w LLVMAddGlobalMapping
-
       - name: Prepare binaries
         run: |
           out=src/internal/llvm/toolchain/bin/windows_amd64
@@ -325,23 +312,35 @@ jobs:
           sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
           sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
 
-          if [ -z "$sdk" ] || [ ! -f "${sdk}um/amd64/kernel32.lib" ]; then
-            echo "No AMD64 kernel32.lib found in any SDK version under $sdk_lib"
+          if [ -z "$sdk" ] || [ ! -f "${sdk}um/x64/kernel32.lib" ]; then
+            echo "No x64 kernel32.lib found in any SDK version under $sdk_lib"
             ls "$sdk_lib"
             exit 1
           fi
 
           echo "Using SDK ${sdk}"
-          cp "${sdk}um/amd64/kernel32.lib" "$out/kernel32.lib"
+          cp "${sdk}um/x64/kernel32.lib" "$out/kernel32.lib"
 
       - name: Verify outputs
         run: |
+          set -euo pipefail
+          archive=src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a   # windows_arm64 in the arm64 job
+
           test -f src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-          test -f src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a
-          symbols=$(nm --defined-only src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a)
+          test -f "$archive"
+
+          # tr -d '\r' guards against CRLF output from Windows binaries
+          symbols=$(nm --defined-only "$archive" | tr -d '\r')
+
+          missing=0
           for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
-            echo "$symbols" | grep -q " T $symbol\$" || { echo "Missing LLVM symbol: $symbol"; exit 1; }
+            if ! echo "$symbols" | grep -qw "$symbol"; then
+              echo "Missing LLVM symbol: $symbol"
+              missing=1
+            fi
           done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "All required LLVM symbols present"
 
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
@@ -409,6 +408,7 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
@@ -501,12 +501,24 @@ jobs:
 
       - name: Verify outputs
         run: |
+          set -euo pipefail
+          archive=src/internal/llvm/toolchain/lib/windows_arm64/libLLVM.a   # windows_arm64 in the arm64 job
+
           test -f src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
-          test -f src/internal/llvm/toolchain/lib/windows_arm64/libLLVM.a
-          symbols=$(nm --defined-only src/internal/llvm/toolchain/lib/windows_arm64/libLLVM.a)
+          test -f "$archive"
+
+          # tr -d '\r' guards against CRLF output from Windows binaries
+          symbols=$(nm --defined-only "$archive" | tr -d '\r')
+
+          missing=0
           for symbol in LLVMAddGlobalMapping LLVMCreateExecutionEngineForModule LLVMLinkInInterpreter LLVMLinkInMCJIT; do
-            echo "$symbols" | grep -q " T $symbol\$" || { echo "Missing LLVM symbol: $symbol"; exit 1; }
+            if ! echo "$symbols" | grep -qw "$symbol"; then
+              echo "Missing LLVM symbol: $symbol"
+              missing=1
+            fi
           done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "All required LLVM symbols present"
 
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
