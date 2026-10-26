@@ -25,7 +25,7 @@
 
 /* Define to 1 to prefer forward slashes on Windows, and to 0 prefer
    backslashes. */
-#define LLVM_WINDOWS_PREFER_FORWARD_SLASH 0
+#define LLVM_WINDOWS_PREFER_FORWARD_SLASH 1
 
 /* Define to 1 if you have the `backtrace' function. */
 /* #undef HAVE_BACKTRACE */
@@ -88,7 +88,7 @@
 /* #undef HAVE_GETRUSAGE */
 
 /* Define to 1 if you have the `isatty' function. */
-/* #undef HAVE_ISATTY */
+#define HAVE_ISATTY 1
 
 /* Define to 1 if you have the `edit' library (-ledit). */
 /* #undef HAVE_LIBEDIT */
@@ -187,10 +187,10 @@
 #define HAVE__CHSIZE_S 1
 
 /* Define to 1 if you have the `_Unwind_Backtrace' function. */
-/* #undef HAVE__UNWIND_BACKTRACE */
+#define HAVE__UNWIND_BACKTRACE 1
 
 /* Have host's __alloca */
-/* #undef HAVE___ALLOCA */
+#define HAVE___ALLOCA 1
 
 /* Have host's __ashldi3 */
 /* #undef HAVE___ASHLDI3 */
@@ -199,7 +199,7 @@
 /* #undef HAVE___ASHRDI3 */
 
 /* Have host's __chkstk */
-#define HAVE___CHKSTK 1
+/* #undef HAVE___CHKSTK */
 
 /* Have host's __chkstk_ms */
 /* #undef HAVE___CHKSTK_MS */
@@ -223,7 +223,7 @@
 /* #undef HAVE___LSHRDI3 */
 
 /* Have host's __main */
-/* #undef HAVE___MAIN */
+#define HAVE___MAIN 1
 
 /* Have host's __moddi3 */
 /* #undef HAVE___MODDI3 */
@@ -235,10 +235,10 @@
 /* #undef HAVE___UMODDI3 */
 
 /* Have host's ___chkstk */
-/* #undef HAVE____CHKSTK */
+#define HAVE____CHKSTK 1
 
 /* Have host's ___chkstk_ms */
-/* #undef HAVE____CHKSTK_MS */
+#define HAVE____CHKSTK_MS 1
 
 /* Linker version detected at compile time. */
 /* #undef HOST_LINK_VERSION */
@@ -293,6 +293,6 @@
 
 /* #undef HAVE_PROC_PID_RUSAGE */
 
-/* #undef HAVE_BUILTIN_THREAD_POINTER */
+#define HAVE_BUILTIN_THREAD_POINTER 1
 
 #endif
