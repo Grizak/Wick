@@ -299,6 +299,21 @@ jobs:
           ranlib "$out/libLLVM.a"
           echo "Archived $(ar t "$out/libLLVM.a" | wc -l) objects"
 
+      - name: Debug missing symbols
+        run: |
+          # 1. Is the symbol in the build output at all?
+          nm --defined-only llvm-project/build/lib/libLLVMExecutionEngine.a 2>/dev/null | grep -i 'LLVMAddGlobalMapping\|LLVMLinkIn'
+
+          # 2. Is the ExecutionEngine library present?
+          ls llvm-project/build/lib | grep -i execution
+
+          # 3. Which object file holds the binding code, and is it in the merged archive?
+          ar t llvm-project/build/lib/libLLVMExecutionEngine.a | grep -i binding
+          ar t src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a | grep -i binding
+
+          # 4. What nm type letter does the symbol actually get?
+          nm -A src/internal/llvm/toolchain/lib/windows_amd64/libLLVM.a | grep -w LLVMAddGlobalMapping
+
       - name: Prepare binaries
         run: |
           out=src/internal/llvm/toolchain/bin/windows_amd64
