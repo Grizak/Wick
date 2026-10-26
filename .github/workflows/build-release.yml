@@ -15,6 +15,11 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: git lfs pull --include="src/internal/llvm/toolchain/bin/linux_amd64/*,src/internal/llvm/toolchain/bin/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_amd64/*,src/internal/llvm/toolchain/lib/linux_arm64/*"
+      - name: Export LLVM link flags
+        shell: bash
+        run: |
+          echo "LLVM_LDFLAGS_LINUX_AMD64=$(scripts/llvm-ldflags.sh linux_amd64)" >> "$GITHUB_ENV"
+          echo "LLVM_LDFLAGS_LINUX_ARM64=$(scripts/llvm-ldflags.sh linux_arm64)" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -50,23 +55,30 @@ jobs:
           name: dist-packages
           path: repo-packages/
 
-  build-windows:
+  build-windows-amd64:
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            msvc_arch: amd64
-          - arch: arm64
-            msvc_arch: amd64_arm64
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_${{ matrix.arch }}/*,src/internal/llvm/toolchain/lib/windows_${{ matrix.arch }}/*"
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MINGW64
+          update: false
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-binutils
+      - name: Put MinGW on PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\mingw64\bin"
+      - name: Export LLVM link flags
+        shell: bash
+        run: |
+          echo "LLVM_LDFLAGS_WINDOWS_AMD64=$(scripts/llvm-ldflags.sh windows_amd64)" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -76,27 +88,18 @@ jobs:
           New-Item -ItemType Directory -Force src\internal\assets | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
           go mod tidy
-      - name: Configure Visual Studio toolchain
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{ matrix.msvc_arch }}
-      - name: Install Clang
-        shell: pwsh
-        run: |
-          choco install llvm --yes --no-progress
-          "$env:ProgramFiles\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
         with:
-          args: release --clean --skip=publish --config .goreleaser.windows-${{ matrix.arch }}.yaml
+          args: release --clean --skip=publish --config .goreleaser.windows-amd64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Build Windows snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
         with:
-          args: release --clean --snapshot --skip=publish --config .goreleaser.windows-${{ matrix.arch }}.yaml
+          args: release --clean --snapshot --skip=publish --config .goreleaser.windows-amd64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Stage release assets
@@ -106,7 +109,63 @@ jobs:
           Copy-Item dist\*.zip release-assets\ -Force
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-release-windows-${{ matrix.arch }}
+          name: dist-release-windows-amd64
+          path: release-assets\
+
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+      - name: Pull LFS objects from Forgejo
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: CLANGARM64
+          update: false
+          install: >-
+            mingw-w64-clang-aarch64-clang
+      - name: Put CLANGARM64 on PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\clangarm64\bin"
+      - name: Export LLVM link flags
+        shell: bash
+        run: |
+          echo "LLVM_LDFLAGS_WINDOWS_ARM64=$(scripts/llvm-ldflags.sh windows_arm64)" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Prepare build assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src\internal\assets | Out-Null
+          Copy-Item LICENSE src\internal\assets\LICENSE -Force
+          go mod tidy
+      - name: Build Windows release
+        uses: goreleaser/goreleaser-action@v6
+        if: github.ref_type == 'tag'
+        with:
+          args: release --clean --skip=publish --config .goreleaser.windows-arm64.yaml
+        env:
+          PROJECT_ROOT: ${{ github.workspace }}
+      - name: Build Windows snapshot
+        uses: goreleaser/goreleaser-action@v6
+        if: github.ref_type != 'tag'
+        with:
+          args: release --clean --snapshot --skip=publish --config .goreleaser.windows-arm64.yaml
+        env:
+          PROJECT_ROOT: ${{ github.workspace }}
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets | Out-Null
+          Copy-Item dist\*.zip release-assets\ -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-release-windows-arm64
           path: release-assets\
 
   build-darwin:
@@ -118,6 +177,10 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+      - name: Export LLVM link flags
+        shell: bash
+        run: |
+          echo "LLVM_LDFLAGS_DARWIN_ARM64=$(scripts/llvm-ldflags.sh darwin_arm64)" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -146,7 +209,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-darwin]
+    needs: [build-linux, build-windows-amd64, build-windows-arm64, build-darwin]
     if: github.ref_type == 'tag'
     permissions:
       contents: write
