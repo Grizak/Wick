@@ -33,11 +33,10 @@ case "$platform" in
     echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread"
     ;;
   windows_amd64)
-    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -lstdc++ -lpsapi -lshell32 -lole32 -luuid -ladvapi32"
+    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -lstdc++ -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32"
     ;;
   windows_arm64)
-    # Use -lc++ or -lstdc++, whichever the archive references (check with nm)
-    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -lc++ -lpsapi -lshell32 -lole32 -luuid -ladvapi32"
+    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -lc++ -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32"
     ;;
   darwin_*)
     # ld64 has no --start-group. Order matters, so if you see undefined
