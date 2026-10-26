@@ -303,11 +303,21 @@ jobs:
         run: |
           out=src/internal/llvm/toolchain/bin/windows_amd64
           mkdir -p "$out"
+
           cp llvm-project/build/bin/lld-link.exe "$out/"
 
-          # Wick's output linker needs the MSVC-format kernel32.lib from the SDK
-          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/Lib"/*/ | sort -V | tail -n1)
-          cp "${sdk}um/x64/kernel32.lib" "$out/kernel32.lib"
+          # Windows SDK version folders look like 10.0.26100.0
+          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
+          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
+
+          if [ -z "$sdk" ] || [ ! -f "${sdk}um/arm64/kernel32.lib" ]; then
+            echo "No ARM64 kernel32.lib found in any SDK version under $sdk_lib"
+            ls "$sdk_lib"
+            exit 1
+          fi
+
+          echo "Using SDK ${sdk}"
+          cp "${sdk}um/arm64/kernel32.lib" "$out/kernel32.lib"
 
       - name: Verify outputs
         run: |
@@ -458,13 +468,20 @@ jobs:
         run: |
           out=src/internal/llvm/toolchain/bin/windows_arm64
           mkdir -p "$out"
+
           cp llvm-project/build/bin/lld-link.exe "$out/"
 
-          # Wick's output linker needs the MSVC-format kernel32.lib from the SDK (ARM64 variant)
-          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/Lib"/*/ | sort -V | tail -n1)
-          if [ ! -f "${sdk}um/arm64/kernel32.lib" ]; then
-            echo "No ARM64 kernel32.lib under ${sdk}um/arm64"; exit 1
+          # Windows SDK version folders look like 10.0.26100.0
+          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
+          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
+
+          if [ -z "$sdk" ] || [ ! -f "${sdk}um/arm64/kernel32.lib" ]; then
+            echo "No ARM64 kernel32.lib found in any SDK version under $sdk_lib"
+            ls "$sdk_lib"
+            exit 1
           fi
+
+          echo "Using SDK ${sdk}"
           cp "${sdk}um/arm64/kernel32.lib" "$out/kernel32.lib"
 
       - name: Verify outputs
