@@ -252,13 +252,18 @@ jobs:
           set -euo pipefail
           mkdir -p "$out"
 
-          work="$PWD/llvm-objs"
+          work=llvm-objs                      # relative, so the MRI script stays relative
           rm -rf "$work"
           mkdir -p "$work"
 
           for lib in llvm-project/build/lib/*.a; do
+            # Import libraries for DLLs (e.g. libLTO.dll.a) have no object members
+            case "$lib" in
+              *.dll.a) echo "Skipping import library $lib"; continue ;;
+            esac
+
             name=$(basename "$lib" .a)
-            lib_abs="$PWD/$lib"          # resolve before cd'ing into the temp dir
+            lib_abs="$PWD/$lib"
             tmp="$work/tmp"
             rm -rf "$tmp"
             mkdir -p "$tmp"
@@ -402,13 +407,18 @@ jobs:
           set -euo pipefail
           mkdir -p "$out"
 
-          work="$PWD/llvm-objs"
+          work=llvm-objs                      # relative, so the MRI script stays relative
           rm -rf "$work"
           mkdir -p "$work"
 
           for lib in llvm-project/build/lib/*.a; do
+            # Import libraries for DLLs (e.g. libLTO.dll.a) have no object members
+            case "$lib" in
+              *.dll.a) echo "Skipping import library $lib"; continue ;;
+            esac
+
             name=$(basename "$lib" .a)
-            lib_abs="$PWD/$lib"          # resolve before cd'ing into the temp dir
+            lib_abs="$PWD/$lib"
             tmp="$work/tmp"
             rm -rf "$tmp"
             mkdir -p "$tmp"
