@@ -11,6 +11,12 @@ if [ ! -d "$dir" ]; then
   exit 1
 fi
 
+# On Windows (MSYS2), emit a mixed path like D:/a/Wick/Wick/... that native
+# MinGW ld and gcc can open. /d/... paths only work inside MSYS2 itself.
+if command -v cygpath >/dev/null 2>&1; then
+  dir=$(cygpath -m "$dir")
+fi
+
 libs=()
 for f in "$dir"/lib*.a; do
   base=$(basename "$f" .a)
