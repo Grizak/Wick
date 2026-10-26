@@ -4,7 +4,6 @@ before:
   hooks:
     - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets
     - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
-    - go mod tidy
 
 builds:
   - id: linux-amd64

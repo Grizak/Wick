@@ -87,7 +87,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force src\internal\assets | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
-          go mod tidy
+
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
@@ -143,7 +143,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force src\internal\assets | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
-          go mod tidy
+
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
