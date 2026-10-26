@@ -132,6 +132,7 @@ Requires Go 1.26.2+.
 ```bash
 git clone https://github.com/Grizak/Wick
 cd Wick
+make setup
 make
 ```
 
