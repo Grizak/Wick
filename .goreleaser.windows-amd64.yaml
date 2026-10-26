@@ -13,11 +13,11 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CC=clang --target=x86_64-pc-windows-msvc
-      - CXX=clang++ --target=x86_64-pc-windows-msvc
-      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}\src\internal\llvm\toolchain\include\windows_amd64
-      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}\src\internal\llvm\toolchain\include\windows_amd64 -std=c++17
-      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}\src\internal\llvm\toolchain\lib\windows_amd64\LLVM.lib
+      - CC=gcc
+      - CXX=g++
+      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64
+      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64 -std=c++17
+      - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_WINDOWS_AMD64 }}
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"

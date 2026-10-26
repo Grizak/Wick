@@ -19,7 +19,7 @@ builds:
       - CXX=g++
       - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64
       - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_amd64 -std=c++17
-      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_amd64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
+      - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_LINUX_AMD64 }}
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
@@ -36,7 +36,7 @@ builds:
       - CXX=aarch64-linux-gnu-g++
       - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64
       - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64 -std=c++17
-      - CGO_LDFLAGS={{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/lib/linux_arm64/libLLVM.a -static-libstdc++ -static-libgcc -lstdc++ -lm -ldl -pthread
+      - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_LINUX_ARM64 }}
     ldflags:
       - "-s -w"
       - "-X main.version={{ .Version }}"
