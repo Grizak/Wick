@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+
+# Only regenerate when the changelog is part of this commit
+if git diff --cached --name-only | grep -qx 'CHANGELOG.md'; then
+  "$root/scripts/split-changelog.sh"
+  git add "$root/release-notes/"
+fi

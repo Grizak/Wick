@@ -64,3 +64,6 @@ clean:
 
 package:
 	goreleaser release --skip=publish --clean
+
+setup:
+	git config core.hooksPath .githooks
