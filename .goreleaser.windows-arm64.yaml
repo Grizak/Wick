@@ -20,7 +20,7 @@ builds:
       - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_WINDOWS_ARM64 }}
     ldflags:
       - "-s -w"
-      - "-X main.version={{ .Version }}"
+      - "-X main.version=v{{ .Version }}"
 
 archives:
   - id: windows-archives

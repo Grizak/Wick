@@ -20,7 +20,7 @@ builds:
       - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_LINUX_AMD64 }}
     ldflags:
       - "-s -w"
-      - "-X main.version={{ .Version }}"
+      - "-X main.version=v{{ .Version }}"
 
   - id: linux-arm64
     main: ./src/cmd/wick
