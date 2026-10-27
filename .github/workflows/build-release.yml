@@ -41,6 +41,22 @@ jobs:
           args: release --clean --snapshot --skip=publish --config .goreleaser.linux.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Report dynamic dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for bin in $(find dist -type f -name wick); do
+            echo "== $bin"
+            READELF=readelf; OBJDUMP=objdump
+            if [[ "$bin" == *arm64* ]]; then
+              READELF=aarch64-linux-gnu-readelf
+              OBJDUMP=aarch64-linux-gnu-objdump
+            fi
+            $READELF -d "$bin" | grep -E 'NEEDED|RPATH|RUNPATH' || true
+            echo "max GLIBC symbol version:"
+            $OBJDUMP -T "$bin" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 || true
+          done
       - name: Stage release assets
         run: |
           mkdir -p release-assets repo-packages
@@ -102,6 +118,14 @@ jobs:
           args: release --clean --snapshot --skip=publish --config .goreleaser.windows-amd64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Report DLL dependencies
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Recurse -Filter wick.exe | ForEach-Object {
+            Write-Host "== $($_.FullName)"
+            objdump -p $_.FullName | Select-String 'DLL Name'
+          }
       - name: Stage release assets
         shell: pwsh
         run: |
@@ -158,6 +182,14 @@ jobs:
           args: release --clean --snapshot --skip=publish --config .goreleaser.windows-arm64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Report DLL dependencies
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Recurse -Filter wick.exe | ForEach-Object {
+            Write-Host "== $($_.FullName)"
+            llvm-objdump -p $_.FullName | Select-String 'DLL Name'
+          }
       - name: Stage release assets
         shell: pwsh
         run: |
@@ -198,6 +230,19 @@ jobs:
           args: release --clean --snapshot --skip=publish --config .goreleaser.darwin.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Report linked libraries
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          for bin in $(find dist -type f -name wick); do
+            echo "== $bin"
+            otool -L "$bin" || echo "::warning::otool failed on $bin"
+            # Fail if anything points at Homebrew or other non-system paths
+            if otool -L "$bin" | grep -E '/opt/homebrew|/usr/local/'; then
+              echo "::warning::non-system dependency found in $bin"
+            fi
+          done
       - name: Stage release assets
         run: |
           mkdir -p release-assets
