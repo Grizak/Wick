@@ -101,8 +101,9 @@ jobs:
       - name: Prepare build assets
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force src\internal\assets | Out-Null
+          New-Item -ItemType Directory -Force src\internal\assets\changelog | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
+          Copy-Item release-notes\*.md src\internal\assets\changelog\ -Force
 
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
@@ -165,8 +166,9 @@ jobs:
       - name: Prepare build assets
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force src\internal\assets | Out-Null
+          New-Item -ItemType Directory -Force src\internal\assets\changelog | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
+          Copy-Item release-notes\*.md src\internal\assets\changelog\ -Force
 
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6

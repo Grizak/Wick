@@ -1,6 +1,9 @@
 package assets
 
-import _ "embed"
+import "embed"
 
 //go:embed LICENSE
 var License string
+
+//go:embed changelog/*
+var Changelog embed.FS

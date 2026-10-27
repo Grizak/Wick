@@ -13,16 +13,19 @@ LDFLAGS_linux_arm64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh linux_arm64)
 LDFLAGS_windows_amd64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh windows_amd64)
 LDFLAGS_darwin_arm64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh darwin_arm64)
 
+version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+
 dev:
 	mkdir -p $(dir $(DEV_OUT))
 	mkdir -p src/internal/assets
 	cp LICENSE src/internal/assets/LICENSE
+	cp release-notes/*.md src/internal/assets/changelog/
 	CC=gcc CXX=g++ \
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="-I$(LLVM_INCLUDE)" \
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
-	go build -tags "byollvm llvm20" -ldflags "-X main.version=dev" -o "$(DEV_OUT)" ./src/cmd/wick
+	go build -tags "byollvm llvm20" -ldflags "-X main.version=$(version)" -o "$(DEV_OUT)" ./src/cmd/wick
 
 release:
 	goreleaser release --clean
