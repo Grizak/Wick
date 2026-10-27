@@ -356,29 +356,32 @@ function PackageDownloads({ release }: { release: PackageVersion }) {
   }
 
   return (
-    <div className="download-grid">
-      {groups.map(([platform, files]) =>
-        files.map((file, index) => (
-          <a
-            className="download-link"
-            href={file.path ? `${REGISTRY_URL}/${file.path.replace(/^\/+/, '')}` : undefined}
-            key={`${platform}-${file.path ?? index}`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <span className="download-icon" aria-hidden="true">↓</span>
-            <span className="download-copy">
-              <strong>{platform}</strong>
-              <small>{file.path?.split('/').at(-1) ?? 'Package download'}</small>
-              {file.installcommand && (
-                <code className="download-command">{file.installcommand}</code>
-              )}
-            </span>
-            <span className="download-size">{formatSize(file.size)}</span>
-          </a>
-        )),
-      )}
-    </div>
+    <>
+      <a href={`https://github.com/Grizak/Wick/releases/tag/${release}`} className="download-link" rel="noreferrer" target='_blank'>Open on github releases</a>
+      <div className="download-grid">
+        {groups.map(([platform, files]) =>
+          files.map((file, index) => (
+            <a
+              className="download-link"
+              href={file.path ? `${REGISTRY_URL}/${file.path.replace(/^\/+/, '')}` : undefined}
+              key={`${platform}-${file.path ?? index}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <span className="download-icon" aria-hidden="true">↓</span>
+              <span className="download-copy">
+                <strong>{platform}</strong>
+                <small>{file.path?.split('/').at(-1) ?? 'Package download'}</small>
+                {file.installcommand && (
+                  <code className="download-command">{file.installcommand}</code>
+                )}
+              </span>
+              <span className="download-size">{formatSize(file.size)}</span>
+            </a>
+          )),
+        )}
+      </div>
+    </>
   )
 }
 
