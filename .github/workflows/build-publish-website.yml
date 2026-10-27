@@ -23,6 +23,14 @@ jobs:
           ref: gh-pages
           path: site
 
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: master/website/pnpm-lock.yaml
+
       - name: Serialise changes in the repo
         uses: tj-actions/changed-files@v46
         id: changes
@@ -35,20 +43,20 @@ jobs:
               - "release-notes/**"
 
       - name: Build website if needed
-        if: steps.changes.output.website_any_changed == 'true'
+        if: steps.changes.outputs.website_any_changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           cd master/website
           pnpm install --frozen-lockfile
           pnpm build
-
-          # Copy the built website to the site directory
-          cp -r dist/* ../site/
+          cd "$GITHUB_WORKSPACE"
+          cp -r master/website/dist/. site/
 
       - name: Update changelog if needed
-        if: steps.changes.output.changelog_any_changed == 'true'
+        if: steps.changes.outputs.changelog_any_changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
+          mkdir -p site/changelog
           cp master/release-notes/*.md site/changelog/
-          ./master/scripts/update-changelog-index.sh site/changelog/ > site/changelog/index.md
+          ./master/scripts/update-changelog-index.sh site/changelog/ > site/changelog.index.json
 
       - name: Commit and push changes
         run: |
