@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v4.2.1] - 2026-10-27
+
+- Bugfix: llvm.RegisterAllTargetInfos() added
+- Implemented opt passes
+
 ## [v4.2.0] - 2026-10-27
 
 - Added an actual markdown parser to add color and formatting to the changelogs
