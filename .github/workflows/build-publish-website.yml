@@ -24,7 +24,7 @@ jobs:
           path: site
 
       - name: Serialise changes in the repo
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v46
         id: changes
         with:
           path: master
