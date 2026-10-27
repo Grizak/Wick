@@ -1,11 +1,24 @@
 package opt
 
 import (
+	"fmt"
+
 	"tinygo.org/x/go-llvm"
 )
 
-func Optimize(mod *llvm.Module, level int) error {
-	// TODO: Implement optimization passes based on the level
-	// For now, just return nil to indicate no error.
-	return nil
+var (
+	opts llvm.PassBuilderOptions
+)
+
+func Initialize() {
+	opts := llvm.NewPassBuilderOptions()
+	opts.SetVerifyEach(true)
+}
+
+func Deinitialize() {
+	opts.Dispose()
+}
+
+func Optimize(mod *llvm.Module, level int, targetMachine llvm.TargetMachine) error {
+	return mod.RunPasses(fmt.Sprintf("default<O%d>", level), targetMachine, opts)
 }
