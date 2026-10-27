@@ -357,7 +357,7 @@ function PackageDownloads({ release }: { release: PackageVersion }) {
 
   return (
     <>
-      <a href={`https://github.com/Grizak/Wick/releases/tag/${release}`} className="download-link" rel="noreferrer" target='_blank'>Open on github releases</a>
+      <a href={`https://github.com/Grizak/Wick/releases/tag/${release.version}`} className="github-link" rel="noreferrer" target='_blank'>Open on github releases</a>
       <div className="download-grid">
         {groups.map(([platform, files]) =>
           files.map((file, index) => (
