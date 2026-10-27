@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Grizak/Wick/src/internal/assets"
+	"github.com/Grizak/Wick/src/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,8 @@ var changelogCmd = &cobra.Command{
 			fmt.Println("Error reading changelog:", err)
 			return
 		}
-		fmt.Println(string(changelog))
+		fmt.Printf("%s:\n", v)
+		utils.PrintMd(string(changelog))
 	},
 }
 

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added an actual markdown parser to add color and formatting to the changelogs
+
 ## [v4.1.4] - 2026-10-27
 
 - Update the versioning to be more robust
