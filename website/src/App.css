@@ -738,6 +738,25 @@
   background: rgba(194, 243, 107, 0.035);
 }
 
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 11px 10px;
+  margin-bottom: 10px
+  border: 1px solid rgba(235, 244, 232, 0.1);
+  border-radius: 3px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.github-link:hover {
+  border-color: rgba(194, 243, 107, 0.42);
+  background: rgba(194, 243, 107, 0.035);
+}
+
 .download-icon {
   width: 26px;
   height: 26px;
@@ -1015,7 +1034,8 @@
     font-size: 7px;
   }
 
-  .download-link {
+  .download-link, 
+  .github-link {
     gap: 8px;
     padding: 9px 7px;
   }
