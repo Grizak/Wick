@@ -2,7 +2,7 @@ version: 2
 project_name: wick
 before:
   hooks:
-    - go run ./scripts/prepare-assets
+    - go run ./scripts/prepare-assets.go
 
 builds:
   - id: darwin-arm64

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.1.3] - 2026-10-27
+
+- Update workflow to use a go script to copy assets
+
 ## [v4.1.2] - 2026-10-27
 
 - Update workflow to commit assets dir
