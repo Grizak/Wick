@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.1.1] - 2026-10-27
+
+- Updated the workflow to run the before hooks there instead of in goreleaser
+
 ## [v4.1.0] - 2026-10-27
 
 - Added changelog command
