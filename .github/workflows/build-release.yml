@@ -33,6 +33,13 @@ jobs:
           mkdir -p src/internal/assets/changelog
           cp LICENSE src/internal/assets/LICENSE
           cp release-notes/*.md src/internal/assets/changelog/
+      - name: Commit build assets
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/internal/assets/
+          git commit -m "Add build assets for release" || echo "No changes to commit"
       - name: Build Linux release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
@@ -110,7 +117,13 @@ jobs:
           New-Item -ItemType Directory -Force src\internal\assets\changelog | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
           Copy-Item release-notes\*.md src\internal\assets\changelog\ -Force
-
+      - name: Commit build assets
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/internal/assets/
+          git commit -m "Add build assets for release" || echo "No changes to commit"
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
@@ -175,7 +188,13 @@ jobs:
           New-Item -ItemType Directory -Force src\internal\assets\changelog | Out-Null
           Copy-Item LICENSE src\internal\assets\LICENSE -Force
           Copy-Item release-notes\*.md src\internal\assets\changelog\ -Force
-
+      - name: Commit build assets
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/internal/assets/
+          git commit -m "Add build assets for release" || echo "No changes to commit"
       - name: Build Windows release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
@@ -230,6 +249,13 @@ jobs:
           mkdir -p src/internal/assets/changelog
           cp LICENSE src/internal/assets/LICENSE
           cp release-notes/*.md src/internal/assets/changelog/
+      - name: Commit build assets
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/internal/assets/
+          git commit -m "Add build assets for release" || echo "No changes to commit"
       - name: Build Darwin release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
