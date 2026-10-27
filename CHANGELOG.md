@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v4.1.0] - 2026-10-27
+
+- Added changelog command
+- Made it read the changelog from inside the binary
+
 ## [v4.0.2] - 2026-10-26
 
 Added changelog for this version and v4.0.1 because I forgot for that version and the release then subsequently failed
