@@ -17,9 +17,7 @@ version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 
 dev:
 	mkdir -p $(dir $(DEV_OUT))
-	mkdir -p src/internal/assets
-	cp LICENSE src/internal/assets/LICENSE
-	cp release-notes/*.md src/internal/assets/changelog/
+	go run ./scripts/prepare-assets.go
 	CC=gcc CXX=g++ \
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="-I$(LLVM_INCLUDE)" \
