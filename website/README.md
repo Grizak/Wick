@@ -1,35 +1,33 @@
-# React + TypeScript + Vite
+# Wick website
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The website is a React + TypeScript application built with Vite.
 
-Currently, two official plugins are available:
+## Data sources
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The changelog view reads from the site origin:
 
-## React Compiler
+- `/changelog.index.json` lists changelog files or entries.
+- `/changelog` may return a combined Markdown or JSON changelog as a fallback.
+- File entries in the index are loaded from `/changelog/<file>`.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+The index can be a string array of filenames, or an object with a
+`changelogs`, `entries`, `files`, or `items` array. Entries may be filenames or
+objects with `path` (or `file`/`name`), `title`, `version`, `date`, and
+`content`/`body` fields. If an entry includes its content, no separate file
+request is made.
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+Release metadata is loaded from
+`https://pkg.isaksweb.xyz/index.json`. The `wick` package's versions are read
+from that index, then each version record is loaded from
+`https://pkg.isaksweb.xyz/packages/wick/<version>.json`. Artifact `path` values
+in those records are resolved against the registry host.
 
-## Expanding the Oxlint configuration
+## Development
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+pnpm install
+pnpm dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Run `pnpm build` to type-check and create a production build, and `pnpm lint` to
+run Oxlint.
