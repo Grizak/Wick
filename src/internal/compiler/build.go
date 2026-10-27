@@ -69,6 +69,7 @@ func validateTarget(host, target string) error {
 }
 
 func prepareLLVM() error {
+	llvm.InitializeAllTargetInfos()
 	llvm.InitializeAllAsmParsers()
 	llvm.InitializeAllAsmPrinters()
 	llvm.InitializeAllTargetMCs()
@@ -123,6 +124,9 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		llvm.CodeModelDefault,
 	)
 	defer targetMachine.Dispose()
+
+	optimizer.Initialize()
+	defer optimizer.Deinitialize()
 
 	results := make(chan result, len(opts.Input))
 	var wg sync.WaitGroup
@@ -212,7 +216,7 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 	}
 
 	if opt > 0 {
-		if err := optimizer.Optimize(&mod, opt); err != nil {
+		if err := optimizer.Optimize(&mod, opt, targetMachine); err != nil {
 			return "", err
 		}
 	}
