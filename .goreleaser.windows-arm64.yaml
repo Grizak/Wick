@@ -1,5 +1,8 @@
 version: 2
 project_name: wick
+before:
+  hooks:
+    - go run ./scripts/prepare-assets
 
 builds:
   - id: windows-arm64
