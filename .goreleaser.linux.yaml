@@ -1,10 +1,5 @@
 version: 2
 project_name: wick
-before:
-  hooks:
-    - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets/changelog
-    - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
-    - cp release-notes/*.md {{ .Env.PROJECT_ROOT }}/src/internal/assets/changelog/
 
 builds:
   - id: linux-amd64
@@ -50,7 +45,7 @@ archives:
       - tar.gz
     files:
       - LICENSE
-      - release-notes/*.md
+      - release-notes/*
 
 nfpms:
   - id: linux-packages
@@ -72,7 +67,7 @@ nfpms:
         dst: /usr/share/doc/wick/LICENSE
         file_info:
           mode: 0644
-      - src: release-notes/*.md
+      - src: release-notes/*
         dst: /usr/share/doc/wick/changelog/
         file_info:
           mode: 0644
