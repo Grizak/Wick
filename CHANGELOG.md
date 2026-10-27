@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v4.1.2] - 2026-10-27
+
 - Update workflow to commit assets dir
 
 ## [v4.1.1] - 2026-10-27
