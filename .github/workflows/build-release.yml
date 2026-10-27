@@ -27,6 +27,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes g++-aarch64-linux-gnu
+      - name: Prepare build assets
+        shell: bash
+        run: |
+          mkdir -p src/internal/assets/changelog
+          cp LICENSE src/internal/assets/LICENSE
+          cp release-notes/*.md src/internal/assets/changelog/
       - name: Build Linux release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
@@ -218,6 +224,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Prepare build assets
+        shell: bash
+        run: |
+          mkdir -p src/internal/assets/changelog
+          cp LICENSE src/internal/assets/LICENSE
+          cp release-notes/*.md src/internal/assets/changelog/
       - name: Build Darwin release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'

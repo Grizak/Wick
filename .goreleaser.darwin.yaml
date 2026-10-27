@@ -1,10 +1,5 @@
 version: 2
 project_name: wick
-before:
-  hooks:
-    - mkdir -p {{ .Env.PROJECT_ROOT }}/src/internal/assets/changelog
-    - cp LICENSE {{ .Env.PROJECT_ROOT }}/src/internal/assets/LICENSE
-    - cp release-notes/*.md {{ .Env.PROJECT_ROOT }}/src/internal/assets/changelog/
 
 builds:
   - id: darwin-arm64
@@ -32,7 +27,7 @@ archives:
       - tar.gz
     files:
       - LICENSE
-      - release-notes/*.md
+      - release-notes/*
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
