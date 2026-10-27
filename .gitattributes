@@ -1,6 +1,0 @@
-src/internal/llvm/toolchain/lib/** filter=lfs diff=lfs merge=lfs -text
-src/internal/llvm/toolchain/bin/** filter=lfs diff=lfs merge=lfs -text
-src/internal/llvm/toolchain/bin/**/versions.json -filter -diff -merge
-src/llvm/toolchain/bin/** filter=lfs diff=lfs merge=lfs -text
-src/tools/bin/** filter=lfs diff=lfs merge=lfs -text
-**/versions.json !text -filter -merge -diff
