@@ -19,6 +19,7 @@ type NodeStatement struct {
 	Break     *NodeBreak
 	Continue  *NodeContinue
 	Return    *NodeReturn
+	Import    *NodeImport
 }
 
 type NodeExit struct {
@@ -111,4 +112,9 @@ type NodeParam struct {
 	Default *NodeExpression // nil = required, no default
 	Const   bool
 	Pos     types.Position
+}
+
+type NodeImport struct {
+	Module string
+	Pos    types.Position
 }

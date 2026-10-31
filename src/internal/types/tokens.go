@@ -40,6 +40,7 @@ const (
 	TokenContinue     TokenType = "continue"
 	TokenFunctionDecl TokenType = "fn"
 	TokenReturnStmt   TokenType = "return"
+	TokenImport       TokenType = "import"
 )
 
 type Token struct {
