@@ -572,18 +572,19 @@ jobs:
           name: windows-arm64-tools
           path: src/internal/llvm/toolchain/
 
-      - name: Commit and push
+      - name: Commit updated tools
         run: |
-          set -e
+          git checkout dev
+          git pull --ff-only origin dev
+
           git add src/internal/llvm/toolchain/
-          if git diff --staged --quiet; then
-            echo "No changes to commit, skipping push"
+
+          if git diff --cached --quiet; then
+            echo "No toolchain changes."
             exit 0
           fi
-          git commit -m "chore: update tools"
-          git checkout dev
-          git pull --no-rebase origin dev
-          git merge --no-ff chore/update-tools
+
+          git commit -m "chore(llvm): update toolchain to ${{ env.LLVM_VERSION }}"
           git push origin dev
 
       - name: Remove Forgejo credentials
