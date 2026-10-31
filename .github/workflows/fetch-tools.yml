@@ -17,10 +17,12 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux_amd64
+            musl_target: x86_64-linux-musl
             lld_binary: ld.lld
             artifact_name: linux-amd64-tools
           - os: ubuntu-24.04-arm
             platform: linux_arm64
+            musl_target: aarch64-linux-musl
             lld_binary: ld.lld
             artifact_name: linux-arm64-tools
           - os: macos-15
@@ -40,7 +42,36 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build gcc g++ zlib1g-dev
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            wget \
+            xz-utils \
+            patch \
+            perl \
+            zlib1g-dev
+
+      - name: Build musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone --depth 1 \
+            https://github.com/richfelker/musl-cross-make.git
+
+          make -C musl-cross-make \
+            TARGET="${{ matrix.musl_target }}" \
+            OUTPUT="$RUNNER_TEMP/musl-toolchain" \
+            -j"$(nproc)" \
+            install
+
+          TOOLCHAIN="$RUNNER_TEMP/musl-toolchain/bin"
+
+          "$TOOLCHAIN/${{ matrix.musl_target }}-gcc" --version
+          "$TOOLCHAIN/${{ matrix.musl_target }}-g++" --version
+
+          echo "MUSL_CC=$TOOLCHAIN/${{ matrix.musl_target }}-gcc" >> "$GITHUB_ENV"
+          echo "MUSL_CXX=$TOOLCHAIN/${{ matrix.musl_target }}-g++" >> "$GITHUB_ENV"
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -62,16 +93,19 @@ jobs:
         uses: actions/cache@v5
         with:
           path: llvm-project/build
-          key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}
+          key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}-musl
 
       - name: Build LLVM libraries and lld (Linux)
         if: runner.os == 'Linux'
         run: |
           cd llvm-project
+
           cmake -S llvm -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DLLVM_BUILD_STATIC=ON \
+            -DCMAKE_C_COMPILER="$MUSL_CC" \
+            -DCMAKE_CXX_COMPILER="$MUSL_CXX" \
+            -DLLVM_HOST_TRIPLE="${{ matrix.musl_target }}" \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS="lld" \
@@ -80,7 +114,37 @@ jobs:
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
             -DCMAKE_EXE_LINKER_FLAGS="-static"
-          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
+
+          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
+
+      - name: Verify musl outputs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+
+          BIN="src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}"
+          LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
+
+          echo "Checking lld..."
+          file "$BIN"
+          readelf -l "$BIN" | grep INTERP && {
+            echo "ERROR: lld has a dynamic interpreter"
+            exit 1
+          } || true
+
+          echo "Checking for glibc-specific symbol..."
+          if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
+            echo "ERROR: glibc-specific references remain"
+            exit 1
+          fi
+
+          echo "Checking dynamic dependencies..."
+          if readelf -d "$BIN" | grep NEEDED; then
+            echo "ERROR: lld has dynamic dependencies"
+            exit 1
+          fi
+
+          echo "Musl verification passed!"
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
