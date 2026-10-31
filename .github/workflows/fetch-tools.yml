@@ -581,10 +581,10 @@ jobs:
             exit 0
           fi
           git commit -m "chore: update tools"
-          git checkout master
-          git pull --no-rebase origin master
+          git checkout dev
+          git pull --no-rebase origin dev
           git merge --no-ff chore/update-tools
-          git push origin master
+          git push origin dev
 
       - name: Remove Forgejo credentials
         if: always()
