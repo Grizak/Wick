@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Check that we got enough arguments
 if [ $# -lt 3 ]; then
-  echo "Usage: $0 <type> <number> <work>"
+  echo "Usage: $0 <type> <number> <work>" >&2
   exit 1
 fi
 
@@ -11,6 +11,20 @@ NUM=$2
 WORK=$3
 BRANCH="$TYPE/$NUM/$WORK"
 
-gh issue develop $NUM --name $BRANCH --base dev --checkout
-git push -u origin $BRANCH
-gh pr create --fill --draft --title "$TYPE: $WORK (#$NUM)" --body "\n\nCloses #$NUM."
+if ! [[ "$NUM" =~ ^[0-9]+$ ]]; then
+  echo "Error: issue number must be numeric" >&2
+  exit 1
+fi
+
+if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
+  echo "Error: '$BRANCH' is not a valid branch name" >&2
+  exit 1
+fi
+
+gh issue develop "$NUM" --name "$BRANCH" --base dev --checkout
+
+# PRs need at least one commit that differs from the base branch
+git commit --allow-empty -m "chore: start work on #$NUM"
+git push -u origin "$BRANCH"
+
+gh pr create --draft --title "$TYPE: $WORK (#$NUM)" --body "Closes #$NUM."
