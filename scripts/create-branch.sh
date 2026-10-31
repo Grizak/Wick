@@ -36,5 +36,5 @@ git commit --allow-empty -m "chore: start work on #$NUM"
 git push -u origin "$BRANCH"
 
 # ${arr[@]+"${arr[@]}"} avoids an "unbound variable" error on empty arrays with set -u (bash < 4.4)
-gh pr create --draft --title "$TYPE: $WORK (#$NUM)" --body "Closes #$NUM." \
+gh pr create --draft --base dev --title "$TYPE: $WORK (#$NUM)" --body "Closes #$NUM." \
   ${MILESTONE_ARGS[@]+"${MILESTONE_ARGS[@]}"}
