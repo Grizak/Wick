@@ -28,7 +28,7 @@
 #define LLVM_WINDOWS_PREFER_FORWARD_SLASH 0
 
 /* Define to 1 if you have the `backtrace' function. */
-#define HAVE_BACKTRACE TRUE
+/* #undef HAVE_BACKTRACE */
 
 #define BACKTRACE_HEADER <execinfo.h>
 
@@ -40,7 +40,7 @@
 
 /* Define to 1 if you have the declaration of `arc4random', and to 0 if you
    don't. */
-#define HAVE_DECL_ARC4RANDOM 1
+#define HAVE_DECL_ARC4RANDOM 0
 
 /* Define to 1 if you have the declaration of `FE_ALL_EXCEPT', and to 0 if you
    don't. */
@@ -106,10 +106,10 @@
 #define HAVE_LIBPTHREAD 1
 
 /* Define to 1 if you have the `pthread_getname_np' function. */
-#define HAVE_PTHREAD_GETNAME_NP 1
+/* #undef HAVE_PTHREAD_GETNAME_NP */
 
 /* Define to 1 if you have the `pthread_setname_np' function. */
-#define HAVE_PTHREAD_SETNAME_NP 1
+/* #undef HAVE_PTHREAD_SETNAME_NP */
 
 /* Define to 1 if you have the `pthread_get_name_np' function. */
 /* #undef HAVE_PTHREAD_GET_NAME_NP */
@@ -124,10 +124,10 @@
 /* #undef HAVE_MALLCTL */
 
 /* Define to 1 if you have the `mallinfo' function. */
-#define HAVE_MALLINFO 1
+/* #undef HAVE_MALLINFO */
 
 /* Define to 1 if you have the `mallinfo2' function. */
-#define HAVE_MALLINFO2 1
+/* #undef HAVE_MALLINFO2 */
 
 /* Define to 1 if you have the <malloc/malloc.h> header file. */
 /* #undef HAVE_MALLOC_MALLOC_H */
