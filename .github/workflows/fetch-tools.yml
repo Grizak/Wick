@@ -670,20 +670,20 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: musl-toolchain-linux_amd64
-          path: musl-toolchain-linux_amd64.tar.gz
+          path: musl-toolchain-linux_amd64
 
       - uses: actions/download-artifact@v6
         with:
           name: musl-toolchain-linux_arm64
-          path: musl-toolchain-linux_arm64.tar.gz
+          path: musl-toolchain-linux_arm64
 
       - name: Extract musl toolchains
         run: |
           mkdir -p toolchains/musl/linux_amd64
-          tar -xzf musl-toolchain-linux_amd64.tar.gz -C toolchains/musl/linux_amd64
+          tar -xzf musl-toolchain-linux_amd64/musl-toolchain.tar.gz -C toolchains/musl/linux_amd64
 
           mkdir -p toolchains/musl/linux_arm64
-          tar -xzf musl-toolchain-linux_arm64.tar.gz -C toolchains/musl/linux_arm64
+          tar -xzf musl-toolchain-linux_arm64/musl-toolchain.tar.gz -C toolchains/musl/linux_arm64
 
       - name: Commit updated tools
         run: |
