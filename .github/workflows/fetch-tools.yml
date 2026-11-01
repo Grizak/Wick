@@ -96,13 +96,6 @@ jobs:
           echo "MUSL_CC=$TOOLCHAIN/${{ matrix.musl_target }}-gcc" >> "$GITHUB_ENV"
           echo "MUSL_CXX=$TOOLCHAIN/${{ matrix.musl_target }}-g++" >> "$GITHUB_ENV"
 
-      - name: Install musl toolchain (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          mkdir -p "toolchains/musl/${{ matrix.platform }}"
-          cp -a "$RUNNER_TEMP/musl-toolchain/." \
-            "toolchains/musl/${{ matrix.platform }}/"
-
       - name: Generate musl toolchain metadata (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -153,6 +146,13 @@ jobs:
           EOF
 
           cat "$RUNNER_TEMP/musl-toolchain/versions.json"
+
+      - name: Install musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "toolchains/musl/${{ matrix.platform }}"
+          cp -a "$RUNNER_TEMP/musl-toolchain/." \
+            "toolchains/musl/${{ matrix.platform }}/"
 
       - name: Upload musl toolchain (Linux)
         if: runner.os == 'Linux'
