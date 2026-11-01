@@ -96,14 +96,14 @@ jobs:
           echo "MUSL_CC=$TOOLCHAIN/${{ matrix.musl_target }}-gcc" >> "$GITHUB_ENV"
           echo "MUSL_CXX=$TOOLCHAIN/${{ matrix.musl_target }}-g++" >> "$GITHUB_ENV"
 
-      - name: Install musl toolchain
+      - name: Install musl toolchain (Linux)
         if: runner.os == 'Linux'
         run: |
           mkdir -p "toolchains/musl/${{ matrix.platform }}"
           cp -a "$RUNNER_TEMP/musl-toolchain/." \
             "toolchains/musl/${{ matrix.platform }}/"
 
-      - name: Generate musl toolchain metadata
+      - name: Generate musl toolchain metadata (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -156,12 +156,11 @@ jobs:
 
       - name: Upload musl toolchain (Linux)
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: musl-toolchain-${{ matrix.platform }}
           path: toolchains/musl/${{ matrix.platform }}/
           if-no-files-found: error
-          retention-days: 7
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -664,11 +663,11 @@ jobs:
 
       - uses: actions/download-artifact@v6
         with:
-          name: musl-toolchain-linux-amd64
+          name: musl-toolchain-linux_amd64
 
       - uses: actions/download-artifact@v6
         with:
-          name: musl-toolchain-linux-arm64
+          name: musl-toolchain-linux_arm64
 
       - name: Commit updated tools
         run: |
