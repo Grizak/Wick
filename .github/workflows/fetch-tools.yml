@@ -154,7 +154,8 @@ jobs:
           cp -a "$RUNNER_TEMP/musl-toolchain/." \
             "toolchains/musl/${{ matrix.platform }}/"
 
-      - name: Package musl toolchain
+      - name: Package musl toolchain (Linux)
+        if: runner.os == 'Linux'
         run: |
           tar -czf musl-toolchain.tar.gz \
             -C "$RUNNER_TEMP/musl-toolchain" .
