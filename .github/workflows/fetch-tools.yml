@@ -53,14 +53,34 @@ jobs:
             perl \
             zlib1g-dev
 
-      - name: Build musl toolchain (Linux)
+      - name: Clone musl-cross-make (Linux)
         if: runner.os == 'Linux'
         run: |
-          set -euxo pipefail # x = Debugging
-
           git clone --depth 1 \
             --branch v0.9.11 \
             https://github.com/richfelker/musl-cross-make.git
+
+      - name: Download GNU config.sub (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p musl-cross-make/sources
+
+          curl --fail --location \
+            --retry 5 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --output musl-cross-make/sources/config.sub \
+            "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=3d5db9ebe860"
+
+          (
+            cd musl-cross-make/sources
+            sha1sum -c ../hashes/config.sub.3d5db9ebe860.sha1
+          )
+
+      - name: Build musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
 
           make -C musl-cross-make \
             TARGET="${{ matrix.musl_target }}" \
