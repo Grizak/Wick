@@ -56,11 +56,13 @@ jobs:
       - name: Build musl toolchain (Linux)
         if: runner.os == 'Linux'
         run: |
+          set -euxo pipefail # x = Debugging
+
           git clone --depth 1 \
             --branch v0.9.11 \
             https://github.com/richfelker/musl-cross-make.git
 
-            make -C musl-cross-make \
+          make -C musl-cross-make \
             TARGET="${{ matrix.musl_target }}" \
             OUTPUT="$RUNNER_TEMP/musl-toolchain" \
             -j"$(nproc)" \
