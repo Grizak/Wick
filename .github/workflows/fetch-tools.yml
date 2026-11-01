@@ -57,9 +57,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           git clone --depth 1 \
+            --branch v0.9.11 \
             https://github.com/richfelker/musl-cross-make.git
 
-          make -C musl-cross-make \
+            make -C musl-cross-make \
             TARGET="${{ matrix.musl_target }}" \
             OUTPUT="$RUNNER_TEMP/musl-toolchain" \
             -j"$(nproc)" \
@@ -72,6 +73,73 @@ jobs:
 
           echo "MUSL_CC=$TOOLCHAIN/${{ matrix.musl_target }}-gcc" >> "$GITHUB_ENV"
           echo "MUSL_CXX=$TOOLCHAIN/${{ matrix.musl_target }}-g++" >> "$GITHUB_ENV"
+
+      - name: Install musl toolchain
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "toolchains/musl/${{ matrix.platform }}"
+          cp -a "$RUNNER_TEMP/musl-toolchain/." \
+            "toolchains/musl/${{ matrix.platform }}/"
+
+      - name: Generate musl toolchain metadata
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          TARGET="${{ matrix.musl_target }}"
+          TOOLCHAIN="$RUNNER_TEMP/musl-toolchain/bin"
+
+          # Read the effective versions from musl-cross-make.
+          mapfile -t VERSIONS < <(
+            make -s -C musl-cross-make \
+              TARGET="$TARGET" \
+              --eval='print-versions:;@printf "%s\n" "$(GCC_VER)" "$(MUSL_VER)" "$(BINUTILS_VER)" "$(GMP_VER)" "$(MPC_VER)" "$(MPFR_VER)" "$(ISL_VER)" "$(LINUX_VER)"' \
+              print-versions
+          )
+
+          GCC_VER="${VERSIONS[0]}"
+          MUSL_VER="${VERSIONS[1]}"
+          BINUTILS_VER="${VERSIONS[2]}"
+          GMP_VER="${VERSIONS[3]}"
+          MPC_VER="${VERSIONS[4]}"
+          MPFR_VER="${VERSIONS[5]}"
+          ISL_VER="${VERSIONS[6]}"
+          LINUX_VER="${VERSIONS[7]}"
+
+          GCC_ACTUAL=$("$TOOLCHAIN/$TARGET-gcc" -dumpfullversion -dumpversion)
+          BUILD_COMMIT=$(git -C musl-cross-make rev-parse HEAD)
+
+          cat > "$RUNNER_TEMP/musl-toolchain/versions.json" <<EOF
+          {
+            "schema_version": 1,
+            "target": "$TARGET",
+            "builder": {
+              "name": "musl-cross-make",
+              "commit": "$BUILD_COMMIT"
+            },
+            "components": {
+              "gcc": "$GCC_VER",
+              "gcc_reported": "$GCC_ACTUAL",
+              "musl": "$MUSL_VER",
+              "binutils": "$BINUTILS_VER",
+              "gmp": "$GMP_VER",
+              "mpc": "$MPC_VER",
+              "mpfr": "$MPFR_VER",
+              "isl": "$ISL_VER",
+              "linux_headers": "$LINUX_VER"
+            }
+          }
+          EOF
+
+          cat "$RUNNER_TEMP/musl-toolchain/versions.json"
+
+      - name: Upload musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: musl-toolchain-${{ matrix.platform }}
+          path: toolchains/musl/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -116,35 +184,6 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static"
 
           ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
-
-      - name: Verify musl outputs (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-
-          BIN="src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}"
-          LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
-
-          echo "Checking lld..."
-          file "$BIN"
-          readelf -l "$BIN" | grep INTERP && {
-            echo "ERROR: lld has a dynamic interpreter"
-            exit 1
-          } || true
-
-          echo "Checking for glibc-specific symbol..."
-          if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
-            echo "ERROR: glibc-specific references remain"
-            exit 1
-          fi
-
-          echo "Checking dynamic dependencies..."
-          if readelf -d "$BIN" | grep NEEDED; then
-            echo "ERROR: lld has dynamic dependencies"
-            exit 1
-          fi
-
-          echo "Musl verification passed!"
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -219,6 +258,35 @@ jobs:
       - name: Strip binaries (macOS)
         if: runner.os == 'macOS'
         run: strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
+
+      - name: Verify musl outputs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+
+          BIN="src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}"
+          LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
+
+          echo "Checking lld..."
+          file "$BIN"
+          readelf -l "$BIN" | grep INTERP && {
+            echo "ERROR: lld has a dynamic interpreter"
+            exit 1
+          } || true
+
+          echo "Checking for glibc-specific symbol..."
+          if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
+            echo "ERROR: glibc-specific references remain"
+            exit 1
+          fi
+
+          echo "Checking dynamic dependencies..."
+          if readelf -d "$BIN" | grep NEEDED; then
+            echo "ERROR: lld has dynamic dependencies"
+            exit 1
+          fi
+
+          echo "Musl verification passed!"
 
       - name: Write versions
         run: |
@@ -572,12 +640,20 @@ jobs:
           name: windows-arm64-tools
           path: src/internal/llvm/toolchain/
 
+      - uses: actions/download-artifact@v6
+        with:
+          name: musl-toolchain-linux-amd64
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: musl-toolchain-linux-arm64
+
       - name: Commit updated tools
         run: |
           git checkout dev
           git pull --ff-only origin dev
 
-          git add src/internal/llvm/toolchain/
+          git add src/internal/llvm/toolchain/ toolchains/musl/
 
           if git diff --cached --quiet; then
             echo "No toolchain changes."
