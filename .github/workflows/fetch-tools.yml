@@ -619,6 +619,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
+          ref: dev
           lfs: false
 
       - name: Configure Forgejo credentials for LFS
@@ -664,10 +665,12 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: musl-toolchain-linux_amd64
+          path: toolchains/musl/linux_amd64/
 
       - uses: actions/download-artifact@v6
         with:
           name: musl-toolchain-linux_arm64
+          path: toolchains/musl/linux_arm64/
 
       - name: Commit updated tools
         run: |
