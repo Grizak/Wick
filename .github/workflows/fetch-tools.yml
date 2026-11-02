@@ -66,7 +66,7 @@ jobs:
           mkdir -p musl-cross-make/sources
 
           curl --fail --location \
-            --retry 5 \
+            --retry 10 \
             --retry-all-errors \
             --retry-delay 2 \
             --output musl-cross-make/sources/config.sub \
@@ -516,6 +516,11 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
+            -DLLVM_USE_CRT_DEBUG=MT \
+            -DLLVM_USE_CRT_MINSIZEREL=MT \
+            -DLLVM_USE_CRT_RELEASE=MT \
+            -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
             -DLLVM_INCLUDE_TESTS=OFF \
