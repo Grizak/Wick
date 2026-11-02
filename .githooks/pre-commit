@@ -6,5 +6,6 @@ root=$(git rev-parse --show-toplevel)
 # Only regenerate when the changelog is part of this commit
 if git diff --cached --name-only | grep -qx 'CHANGELOG.md'; then
   "$root/scripts/split-changelog.sh"
-  git add "$root/release-notes/"
+  go run "$root/scripts/prepare-assets.go"
+  git add "$root/release-notes/" "$root/src/internal/assets/changelog/"
 fi
