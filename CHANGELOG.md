@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.2.3] - 2026-11-02
+
+- Made some fixes to the release workflow
+
 ## [v4.2.2] - 2026-11-02
 
 - Made linux builds completely static
