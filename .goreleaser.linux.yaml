@@ -30,7 +30,6 @@ builds:
     goos: [linux]
     goarch: [arm64]
     tags: [byollvm, llvm20]
-    tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
       - CC={{ .Env.PROJECT_ROOT }}/toolchains/musl/linux_arm64/bin/aarch64-linux-musl-gcc
