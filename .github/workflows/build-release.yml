@@ -221,8 +221,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs fetch --include="src/internal/llvm/toolchain/bin/darwin_arm64/**,src/internal/llvm/toolchain/lib/darwin_arm64/**"
-          git lfs checkout "src/internal/llvm/toolchain/bin/darwin_arm64/**" "src/internal/llvm/toolchain/lib/darwin_arm64/**"
+          git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*,toolchains/*"
       - name: Export LLVM link flags
         shell: bash
         run: |
