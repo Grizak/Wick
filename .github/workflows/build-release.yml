@@ -46,7 +46,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
         with:
-          args: release --clean --snapshot --skip=publish .goreleaser.${{ matrix.platform }}.yaml
+          args: release --clean --snapshot --skip=publish --config .goreleaser.${{ matrix.platform }}.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Report dynamic dependencies
