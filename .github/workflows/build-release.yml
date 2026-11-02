@@ -27,9 +27,10 @@ jobs:
       - name: Export LLVM link flags
         env:
           PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
         shell: bash
         run: |
-          key="LLVM_LDFLAGS_LINUX_${PLATFORM^^}"
+          key="LLVM_LDFLAGS_LINUX_${ARCH^^}"
           value="$(scripts/llvm-ldflags.sh "$PLATFORM")"
           printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
