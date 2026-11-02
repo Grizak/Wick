@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v4.2.2] - 2026-11-02
+
 - Made linux builds completely static
 
 ## [v4.2.1] - 2026-10-27
