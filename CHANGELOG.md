@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fix workflow (again)
+
 ## [v4.2.4] - 2026-11-02
 
 - Fix workflow
