@@ -24,31 +24,10 @@ builds:
       - "-linkmode=external"
       - "-extldflags=-static"
 
-  - id: linux-arm64
-    main: ./src/cmd/wick
-    binary: wick
-    goos: [linux]
-    goarch: [arm64]
-    tags: [byollvm, llvm20]
-    tags: [byollvm, llvm20]
-    env:
-      - CGO_ENABLED=1
-      - CC={{ .Env.PROJECT_ROOT }}/toolchains/musl/linux_arm64/bin/aarch64-linux-musl-gcc
-      - CXX={{ .Env.PROJECT_ROOT }}/toolchains/musl/linux_arm64/bin/aarch64-linux-musl-g++
-      - CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64
-      - CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/linux_arm64 -std=c++17
-      - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_LINUX_ARM64 }}
-    ldflags:
-      - "-s -w"
-      - "-X main.version=v{{ .Version }}"
-      - "-linkmode=external"
-      - "-extldflags=-static"
-
 archives:
   - id: linux-archives
     ids:
       - linux-amd64
-      - linux-arm64
     formats:
       - tar.gz
     files:
@@ -60,7 +39,6 @@ nfpms:
     package_name: wick
     ids:
       - linux-amd64
-      - linux-arm64
     formats:
       - deb
       - rpm
