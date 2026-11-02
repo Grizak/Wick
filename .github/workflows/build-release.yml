@@ -205,7 +205,9 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+        run: |
+          git lfs fetch --include="src/internal/llvm/toolchain/bin/darwin_arm64/**,src/internal/llvm/toolchain/lib/darwin_arm64/**"
+          git lfs checkout "src/internal/llvm/toolchain/bin/darwin_arm64/**" "src/internal/llvm/toolchain/lib/darwin_arm64/**"
       - name: Export LLVM link flags
         shell: bash
         run: |
@@ -293,6 +295,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: dist-packages-*
+          merge-multiple: true
           path: dist/
       - uses: Grizak/packages/.github/actions/publish@v2
         with:
