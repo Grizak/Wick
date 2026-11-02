@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Made linux builds completely static
+
 ## [v4.2.1] - 2026-10-27
 
 - Bugfix: llvm.RegisterAllTargetInfos() added
