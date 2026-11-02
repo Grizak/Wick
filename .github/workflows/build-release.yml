@@ -31,7 +31,7 @@ jobs:
         run: |
           key="LLVM_LDFLAGS_LINUX_${PLATFORM^^}"
           value="$(scripts/llvm-ldflags.sh "$PLATFORM")"
-          printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV
+          printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
