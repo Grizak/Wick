@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.2.8] - 2026-11-03
+
+- Fix issue with opt passes that caused a segfault
+
 ## [v4.2.7] - 2026-11-03
 
 - Fix workflow (AGAIN)
