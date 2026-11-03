@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.3.0] - 2026-11-03
+
+- Implemented modules
+
 ## [v4.2.8] - 2026-11-03
 
 - Fix issue with opt passes that caused a segfault

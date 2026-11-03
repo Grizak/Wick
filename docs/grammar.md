@@ -3,6 +3,7 @@ $$
   \text{Prog} &\to [\text{Stmt}]^* \\
   [\text{Stmt}] &\to
   \begin{cases}
+    \text{import} \ \text{string\_lit} \\
     [\text{Expr}] \\
     [\text{Cmp}] \\
     [\text{Term}] \\
@@ -17,6 +18,6 @@ $$
   [\text{Expr}] &\to [\text{Cmp}] ([==|!=|<|>|<=|>=] [\text{Cmp}])? \\
   [\text{Cmp}] &\to [\text{Term}] ([+|-] [\text{Term}])^* \\
   [\text{Term}] &\to [\text{Factor}] ([*|/] [\text{Factor}])^* \\
-  [\text{Factor}] &\to \text{int\_lit} \mid \text{ident} \mid ([\text{Expr}])
+  [\text{Factor}] &\to \text{int\_lit} \mid \text{ident} \mid \text{ident}.\text{ident}([\text{Expr}]^*) \mid ([\text{Expr}])
 \end{align}
 $$

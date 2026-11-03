@@ -32,6 +32,13 @@ func (g *Generator) generateNamedFuncDecl(decl *ast.NodeVarDecl) error {
 		return g.error(err.Error(), decl.Pos)
 	}
 	g.typeChecker.Environment().Define(decl.Name, fnType)
+	if g.currentProgram != nil {
+		modulePath := programPath(g.currentProgram)
+		if _, exists := g.moduleFunctions[modulePath]; !exists {
+			g.moduleFunctions[modulePath] = make(map[string]Symbol)
+		}
+		g.moduleFunctions[modulePath][decl.Name] = sym
+	}
 
 	return g.emitFuncBody(fd, fnType, fnValue, decl.Name)
 }
@@ -153,7 +160,26 @@ func (g *Generator) generateReturn(node *ast.NodeReturn) error {
 
 func (g *Generator) generateFuncCall(call *ast.NodeFuncCall) (llvm.Value, error) {
 	sym, exists := g.scope.lookup(call.Name)
-	if !exists {
+	if call.Module != "" {
+		var importNode *ast.NodeImport
+		if g.currentProgram != nil {
+			for i := range g.currentProgram.Statements {
+				candidate := g.currentProgram.Statements[i].Import
+				if candidate != nil && candidate.Namespace == call.Module {
+					importNode = candidate
+					break
+				}
+			}
+		}
+		if importNode == nil {
+			return llvm.Value{}, g.error(fmt.Sprintf("undeclared module: %s", call.Module), call.Pos)
+		}
+		moduleSymbols := g.moduleFunctions[programPath(importNode.Program)]
+		sym, exists = moduleSymbols[call.Name]
+		if !exists {
+			return llvm.Value{}, g.error(fmt.Sprintf("undeclared function: %s.%s", call.Module, call.Name), call.Pos)
+		}
+	} else if !exists {
 		return llvm.Value{}, g.error(fmt.Sprintf("undeclared function: %s", call.Name), call.Pos)
 	}
 	fnType, ok := sym.symbolType.(*typesys.FunctionType)
