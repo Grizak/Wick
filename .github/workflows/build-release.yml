@@ -219,6 +219,10 @@ jobs:
         with:
           fetch-depth: 0
           lfs: false
+          sparse-checkout: |
+            /*
+            !toolchains/musl/
+          sparse-checkout-cone-mode: false
       - name: Pull LFS objects from Forgejo
         run: |
           git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
