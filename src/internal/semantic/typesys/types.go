@@ -46,13 +46,14 @@ type TypeChecker struct {
 	env       *TypeEnvironment
 	filename  string
 	loopDepth int // incremented when entering a loop, decremented when leaving
-
+	modules   map[string]map[string]types.Type
 }
 
 func NewTypeChecker(filename string) *TypeChecker {
 	return &TypeChecker{
 		filename: filename,
 		env:      NewTypeEnvironment(),
+		modules:  make(map[string]map[string]types.Type),
 	}
 }
 
@@ -94,6 +95,9 @@ func (tc *TypeChecker) CheckStatement(stmt *ast.NodeStatement) error {
 	}
 	if stmt.Continue != nil {
 		return tc.CheckContinue(stmt.Continue)
+	}
+	if stmt.Import != nil {
+		return nil
 	}
 	return tc.error("unknown statement type", nil)
 }
@@ -381,7 +385,20 @@ func (tc *TypeChecker) ParseTypeString(typeStr string) (types.Type, error) {
 // CheckFunctionCall validates a function call and returns the return type
 func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (types.Type, error) {
 	// Look up the function type
-	fnType, exists := tc.env.Lookup(call.Name)
+	var fnType types.Type
+	var exists bool
+	if call.Module != "" {
+		module, moduleExists := tc.modules[call.Module]
+		if !moduleExists {
+			return nil, tc.error(fmt.Sprintf("undeclared module: %s", call.Module), &call.Pos)
+		}
+		fnType, exists = module[call.Name]
+		if !exists {
+			return nil, tc.error(fmt.Sprintf("undeclared function: %s.%s", call.Module, call.Name), &call.Pos)
+		}
+	} else {
+		fnType, exists = tc.env.Lookup(call.Name)
+	}
 	if !exists {
 		return nil, tc.error(fmt.Sprintf("undeclared function: %s", call.Name), &call.Pos)
 	}
@@ -414,6 +431,10 @@ func (tc *TypeChecker) CheckFunctionCall(call *ast.NodeFuncCall) (types.Type, er
 	}
 
 	return fn.ReturnType, nil
+}
+
+func (tc *TypeChecker) DefineModule(namespace string, functions map[string]types.Type) {
+	tc.modules[namespace] = functions
 }
 
 // EnterScope creates a new child scope for variables

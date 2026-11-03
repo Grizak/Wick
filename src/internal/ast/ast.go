@@ -40,9 +40,10 @@ type NodeExpression struct {
 }
 
 type NodeFuncCall struct {
-	Name string
-	Args []NodeExpression
-	Pos  types.Position
+	Module string
+	Name   string
+	Args   []NodeExpression
+	Pos    types.Position
 }
 
 type NodeBinExpr struct {
@@ -115,6 +116,9 @@ type NodeParam struct {
 }
 
 type NodeImport struct {
-	Module string
-	Pos    types.Position
+	Module       string
+	Namespace    string
+	ResolvedPath string
+	Program      *NodeProgram
+	Pos          types.Position
 }

@@ -13,14 +13,14 @@ func (p *Parser) parseImportStmt() (*ast.NodeImport, error) {
 	}
 
 	// Expect a string literal for the module path
-	pathToken, err := p.expect(types.TokenStringLiteral)
+	pathToken, err := p.expect(types.TokenStringLit)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the import statement node
 	importStmt := &ast.NodeImport{
-		Module: pathToken.Literal,
+		Module: *pathToken.Value,
 		Pos:    pathToken.Pos,
 	}
 	return importStmt, nil
