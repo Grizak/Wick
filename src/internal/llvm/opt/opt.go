@@ -11,7 +11,7 @@ var (
 )
 
 func Initialize() {
-	opts := llvm.NewPassBuilderOptions()
+	opts = llvm.NewPassBuilderOptions()
 	opts.SetVerifyEach(true)
 }
 
