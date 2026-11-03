@@ -11,6 +11,7 @@ const (
 	TokenOpenBrace    TokenType = "{"
 	TokenCloseBrace   TokenType = "}"
 	TokenComma        TokenType = ","
+	TokenDot          TokenType = "."
 	TokenIntLit       TokenType = "int_lit"
 	TokenFloatLit     TokenType = "float_lit"
 	TokenStringLit    TokenType = "string_lit"

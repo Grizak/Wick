@@ -15,7 +15,7 @@ import (
 	optimizer "github.com/Grizak/Wick/src/internal/llvm/opt"
 	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 	"github.com/Grizak/Wick/src/internal/parser"
-	"github.com/Grizak/Wick/src/internal/semantic/typesys"
+	"github.com/Grizak/Wick/src/internal/semantic/analysis"
 	"github.com/Grizak/Wick/src/internal/target"
 	"github.com/Grizak/Wick/src/internal/types"
 	"tinygo.org/x/go-llvm"
@@ -105,25 +105,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		err        error
 	}
 
-	context := llvm.NewContext()
-	defer context.Dispose()
-
 	targetTriple := target.TargetTriples[opts.Target]
-
-	target, err := llvm.GetTargetFromTriple(targetTriple)
-	if err != nil {
-		return objects, err
-	}
-
-	targetMachine := target.CreateTargetMachine(
-		targetTriple, // Triple
-		"generic",    // CPU
-		"",           // Features
-		llvm.CodeGenLevelDefault,
-		llvm.RelocDefault,
-		llvm.CodeModelDefault,
-	)
-	defer targetMachine.Dispose()
 
 	optimizer.Initialize()
 	defer optimizer.Deinitialize()
@@ -136,7 +118,7 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		go func(input string, index int) {
 			defer wg.Done()
 
-			obj, err := compileFile(input, opts.Output, targetTriple, opts.SaveIntermediaries, index, opts.Opt, context, targetMachine)
+			obj, err := compileFile(input, opts.Output, targetTriple, opts.SaveIntermediaries, index, opts.Opt)
 
 			if err != nil {
 				results <- result{err: err, index: index}
@@ -172,7 +154,20 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 	return objects, nil
 }
 
-func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int, context llvm.Context, targetMachine llvm.TargetMachine) (string, error) {
+func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int) (string, error) {
+	context := llvm.NewContext()
+	defer context.Dispose()
+
+	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		return "", err
+	}
+	targetMachine := llvmTarget.CreateTargetMachine(
+		targetTriple, "generic", "",
+		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
+	)
+	defer targetMachine.Dispose()
+
 	content, err := os.ReadFile(input)
 	if err != nil {
 		return "", fmt.Errorf("Failed to read input file %s: %v\n", input, err)
@@ -182,14 +177,14 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 	output := make(chan types.LexerResult, 4096)
 	go lexer.Tokenize(output)
 
-	parser := parser.NewParser(filepath.Base(input))
+	parser := parser.NewParser(input)
 	program, err := parser.Parse(output)
 	if err != nil {
 		return "", err
 	}
 
-	tc := typesys.NewTypeChecker(input)
-	if err := tc.CheckProgram(&program); err != nil {
+	sa := analysis.NewAnalyzer(input)
+	if err := sa.CheckProgram(&program); err != nil {
 		return "", err
 	}
 

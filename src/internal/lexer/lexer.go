@@ -19,6 +19,7 @@ var singleCharTokens = map[rune]types.TokenType{
 	'[': types.TokenOpenBracket,
 	']': types.TokenCloseBracket,
 	',': types.TokenComma,
+	'.': types.TokenDot,
 	'+': types.TokenPlus,
 	'-': types.TokenMinus,
 	'*': types.TokenStar,
@@ -41,7 +42,7 @@ var keywords = map[string]types.TokenType{
 	"continue": types.TokenContinue,
 	"fn":       types.TokenFunctionDecl,
 	"return":   types.TokenReturnStmt,
-	"import":  types.TokenImport,
+	"import":   types.TokenImport,
 }
 
 type Lexer struct {

@@ -22,6 +22,8 @@ func (g *Generator) generateStatement(stmt *ast.NodeStatement) error {
 		return g.generateContinue(stmt.Continue)
 	case stmt.Return != nil:
 		return g.generateReturn(stmt.Return)
+	case stmt.Import != nil:
+		return g.generateImport(stmt.Import)
 	default:
 		return nil
 	}
