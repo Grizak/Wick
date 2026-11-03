@@ -7,38 +7,52 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux_amd64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            platform: linux_arm64
+            arch: arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/linux_amd64/*,src/internal/llvm/toolchain/bin/linux_arm64/*,src/internal/llvm/toolchain/lib/linux_amd64/*,src/internal/llvm/toolchain/lib/linux_arm64/*"
+        run: git lfs pull --include="src/internal/llvm/toolchain/bin/${{ matrix.platform }},src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
       - name: Export LLVM link flags
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
         shell: bash
         run: |
-          echo "LLVM_LDFLAGS_LINUX_AMD64=$(scripts/llvm-ldflags.sh linux_amd64)" >> "$GITHUB_ENV"
-          echo "LLVM_LDFLAGS_LINUX_ARM64=$(scripts/llvm-ldflags.sh linux_arm64)" >> "$GITHUB_ENV"
+          key="LLVM_LDFLAGS_LINUX_${ARCH^^}"
+          value="$(scripts/llvm-ldflags.sh "$PLATFORM")"
+          printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install arm64 cross-compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes g++-aarch64-linux-gnu
       - name: Build Linux release
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type == 'tag'
         with:
-          args: release --clean --skip=publish --config .goreleaser.linux.yaml
+          args: release --clean --skip=publish --config .goreleaser.${{ matrix.platform }}.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Check git status
+        if: github.ref_type != 'tag'
+        run: |
+          git status
+          git diff --stat
       - name: Build Linux snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
         with:
-          args: release --clean --snapshot --skip=publish --config .goreleaser.linux.yaml
+          args: release --clean --snapshot --skip=publish --config .goreleaser.${{ matrix.platform }}.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
       - name: Report dynamic dependencies
@@ -64,11 +78,11 @@ jobs:
           find dist -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.pkg.tar.zst' \) -exec cp {} repo-packages/ \;
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-release-linux
+          name: dist-release-${{ matrix.platform }}
           path: release-assets/
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-packages
+          name: dist-packages-${{ matrix.arch }}
           path: repo-packages/
 
   build-windows-amd64:
@@ -79,7 +93,11 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
+        run: |
+          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
+          # tell git to ignore musl changes (tracked files)
+          git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
+          git status --porcelain # should be clean
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
@@ -105,6 +123,11 @@ jobs:
           args: release --clean --skip=publish --config .goreleaser.windows-amd64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Check git status
+        if: github.ref_type != 'tag'
+        run: |
+          git status
+          git diff --stat
       - name: Build Windows snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
@@ -138,7 +161,11 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
+        run: |
+          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
+          # tell git to ignore musl changes (tracked files)
+          git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
+          git status --porcelain # should be clean
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
@@ -163,6 +190,11 @@ jobs:
           args: release --clean --skip=publish --config .goreleaser.windows-arm64.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Check git status
+        if: github.ref_type != 'tag'
+        run: |
+          git status
+          git diff --stat
       - name: Build Windows snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
@@ -196,7 +228,11 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+        run: |
+          git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+          # tell git to ignore musl changes (tracked files)
+          git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
+          git status --porcelain # should be clean
       - name: Export LLVM link flags
         shell: bash
         run: |
@@ -211,6 +247,11 @@ jobs:
           args: release --clean --skip=publish --config .goreleaser.darwin.yaml
         env:
           PROJECT_ROOT: ${{ github.workspace }}
+      - name: Check git status
+        if: github.ref_type != 'tag'
+        run: |
+          git status
+          git diff --stat
       - name: Build Darwin snapshot
         uses: goreleaser/goreleaser-action@v6
         if: github.ref_type != 'tag'
@@ -283,7 +324,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist-packages
+          pattern: dist-packages-*
+          merge-multiple: true
           path: dist/
       - uses: Grizak/packages/.github/actions/publish@v2
         with:
