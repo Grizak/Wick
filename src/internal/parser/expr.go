@@ -188,6 +188,20 @@ func (p *Parser) parseFactor() (ast.NodeExpression, error) {
 		if err != nil {
 			return ast.NodeExpression{}, err
 		}
+		module := ""
+		name := *token.Value
+		if p.peek(0).Type == types.TokenDot {
+			_, err := p.consume()
+			if err != nil {
+				return ast.NodeExpression{}, err
+			}
+			member, err := p.expect(types.TokenIdent)
+			if err != nil {
+				return ast.NodeExpression{}, err
+			}
+			module = name
+			name = *member.Value
+		}
 		// Check if this is a function call
 		if p.peek(0).Type == types.TokenOpenParen {
 			_, err := p.consume() // consume (
@@ -217,11 +231,15 @@ func (p *Parser) parseFactor() (ast.NodeExpression, error) {
 			}
 			return ast.NodeExpression{
 				FuncCall: &ast.NodeFuncCall{
-					Name: *token.Value,
-					Args: args,
-					Pos:  token.Pos,
+					Module: module,
+					Name:   name,
+					Args:   args,
+					Pos:    token.Pos,
 				},
 			}, nil
+		}
+		if module != "" {
+			return ast.NodeExpression{}, p.error("expected function call after module namespace", token)
 		}
 		return ast.NodeExpression{Ident: token.Value, Pos: token.Pos}, nil
 	}

@@ -128,6 +128,12 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				return nil, err
 			}
 			stmts = append(stmts, ast.NodeStatement{Return: returnstmt})
+		case types.TokenImport:
+			importstmt, err := p.parseImportStmt()
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{Import: importstmt})
 		default:
 			return nil, p.error("unexpected token", token)
 		}
