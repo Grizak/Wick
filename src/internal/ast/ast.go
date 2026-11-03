@@ -19,6 +19,7 @@ type NodeStatement struct {
 	Break     *NodeBreak
 	Continue  *NodeContinue
 	Return    *NodeReturn
+	Import    *NodeImport
 }
 
 type NodeExit struct {
@@ -39,9 +40,10 @@ type NodeExpression struct {
 }
 
 type NodeFuncCall struct {
-	Name string
-	Args []NodeExpression
-	Pos  types.Position
+	Module string
+	Name   string
+	Args   []NodeExpression
+	Pos    types.Position
 }
 
 type NodeBinExpr struct {
@@ -111,4 +113,12 @@ type NodeParam struct {
 	Default *NodeExpression // nil = required, no default
 	Const   bool
 	Pos     types.Position
+}
+
+type NodeImport struct {
+	Module       string
+	Namespace    string
+	ResolvedPath string
+	Program      *NodeProgram
+	Pos          types.Position
 }

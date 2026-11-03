@@ -13,6 +13,7 @@ This project is actively maintained by me (Grizak) on my [youtube channel](https
 - `if`/`else` control flow
 - `for` loops (infinite, while-style, and C-style)
 - `break`/`continue`
+- Namespaced modules
 - Compiles to native executables via LLVM IR
 - Self-contained compiler binary — no external dependencies required
 - Cross-compilation support
@@ -124,6 +125,22 @@ for let i = 0; i < 10; i = i + 1 {
 exit(0)
 exit(x + 1)
 ```
+
+### Modules
+
+Import a Wick source file and call its functions through the filename-derived
+namespace:
+
+```wick
+import "math.wk"
+
+let result = math.add(2, 3)
+```
+
+Import paths are resolved relative to the importing file. The namespace is the
+imported filename without its extension. Imported files may contain function
+declarations and further imports; top-level executable statements and variables
+are not supported in imported modules. Imports are only allowed at the top level.
 
 ## Building from Source
 

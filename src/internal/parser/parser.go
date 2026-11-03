@@ -28,6 +28,7 @@ func (p *Parser) Parse(input chan types.LexerResult) (ast.NodeProgram, error) {
 		return program, err
 	}
 	program.Statements = stmts
+	program.Filename = p.filename
 	return program, nil
 }
 

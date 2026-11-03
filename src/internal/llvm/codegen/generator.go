@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
@@ -38,14 +39,22 @@ type Generator struct {
 	funcCount         int
 	blockCount        int
 	valueCount        int
+	exitFunction      llvm.Value
+	currentProgram    *ast.NodeProgram
+	moduleFunctions   map[string]map[string]Symbol
+	generatedModules  map[string]bool
+	generatingModules map[string]bool
 }
 
 func NewGenerator(root *ast.NodeProgram, filename string) *Generator {
 	return &Generator{
-		root:        root,
-		fileName:    filename,
-		typeChecker: typesys.NewTypeChecker(filename),
-		scope:       NewScope(nil),
+		root:              root,
+		fileName:          filename,
+		typeChecker:       typesys.NewTypeChecker(filename),
+		scope:             NewScope(nil),
+		moduleFunctions:   make(map[string]map[string]Symbol),
+		generatedModules:  make(map[string]bool),
+		generatingModules: make(map[string]bool),
 	}
 }
 
@@ -55,6 +64,7 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 	g.builder = builder
 	g.context = ctx
 	g.globalScope = g.scope
+	g.currentProgram = g.root
 
 	voidType := ctx.VoidType()
 	entryType := llvm.FunctionType(voidType, nil, false)
@@ -77,10 +87,24 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 	}); err != nil {
 		return err
 	}
+	g.exitFunction = exitFn
 	g.typeChecker.Environment().Define("exit", exitType)
+	if err := g.defineProgramModules(g.root); err != nil {
+		return err
+	}
 
 	builder.SetInsertPointAtEnd(entryBlock)
+	for i := range g.root.Statements {
+		if importNode := g.root.Statements[i].Import; importNode != nil {
+			if err := g.generateImport(importNode); err != nil {
+				return err
+			}
+		}
+	}
 	for _, statement := range g.root.Statements {
+		if statement.Import != nil {
+			continue
+		}
 		if g.currentBlockTerminated() {
 			break
 		}
@@ -96,6 +120,118 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 		return err
 	}
 	return nil
+}
+
+func (g *Generator) defineProgramModules(program *ast.NodeProgram) error {
+	for _, stmt := range program.Statements {
+		if stmt.Import == nil || stmt.Import.Program == nil {
+			continue
+		}
+		functions := make(map[string]types.Type)
+		for _, moduleStmt := range stmt.Import.Program.Statements {
+			decl := moduleStmt.VarDecl
+			if decl == nil || decl.Expr.FuncDecl == nil {
+				continue
+			}
+			expr := decl.Expr
+			fnType, err := g.typeChecker.InferType(&expr)
+			if err != nil {
+				return err
+			}
+			functions[decl.Name] = fnType
+		}
+		g.typeChecker.DefineModule(stmt.Import.Namespace, functions)
+	}
+	return nil
+}
+
+func (g *Generator) generateImport(importNode *ast.NodeImport) error {
+	if importNode.Program == nil {
+		return g.error("module import was not resolved by analysis", importNode.Pos)
+	}
+	return g.generateModule(importNode.Program)
+}
+
+func (g *Generator) generateModule(program *ast.NodeProgram) error {
+	modulePath := programPath(program)
+	if g.generatedModules[modulePath] {
+		return nil
+	}
+	if g.generatingModules[modulePath] {
+		return fmt.Errorf("cyclic module reached during code generation: %s", modulePath)
+	}
+	g.generatingModules[modulePath] = true
+	defer delete(g.generatingModules, modulePath)
+
+	for _, stmt := range program.Statements {
+		if stmt.Import != nil {
+			if err := g.generateImport(stmt.Import); err != nil {
+				return err
+			}
+		}
+	}
+
+	previousScope := g.scope
+	previousGlobalScope := g.globalScope
+	previousTypeChecker := g.typeChecker
+	previousFileName := g.fileName
+	previousProgram := g.currentProgram
+	defer func() {
+		g.scope = previousScope
+		g.globalScope = previousGlobalScope
+		g.typeChecker = previousTypeChecker
+		g.fileName = previousFileName
+		g.currentProgram = previousProgram
+	}()
+
+	g.fileName = program.Filename
+	g.currentProgram = program
+	g.scope = NewScope(nil)
+	g.globalScope = g.scope
+	g.typeChecker = typesys.NewTypeChecker(program.Filename)
+	g.typeChecker.Environment().Define("exit", &typesys.FunctionType{
+		ParamTypes: []types.Type{&typesys.Int64Type{}},
+		ReturnType: &typesys.VoidType{},
+		Defaults:   []*ast.NodeExpression{nil},
+	})
+	if err := g.scope.declare("exit", Symbol{
+		llvmValue: g.exitFunction,
+		isConst:   true,
+		symbolType: &typesys.FunctionType{
+			ParamTypes: []types.Type{&typesys.Int64Type{}},
+			ReturnType: &typesys.VoidType{},
+			Defaults:   []*ast.NodeExpression{nil},
+		},
+	}); err != nil {
+		return err
+	}
+	if err := g.defineProgramModules(program); err != nil {
+		return err
+	}
+	g.moduleFunctions[modulePath] = make(map[string]Symbol)
+	for _, stmt := range program.Statements {
+		if stmt.VarDecl == nil || stmt.VarDecl.Expr.FuncDecl == nil {
+			continue
+		}
+		if err := g.generateNamedFuncDecl(stmt.VarDecl); err != nil {
+			return err
+		}
+		symbol, exists := g.scope.lookup(stmt.VarDecl.Name)
+		if !exists {
+			return g.error(fmt.Sprintf("failed to register module function: %s", stmt.VarDecl.Name), stmt.VarDecl.Pos)
+		}
+		g.moduleFunctions[modulePath][stmt.VarDecl.Name] = symbol
+	}
+	g.generatedModules[modulePath] = true
+	return nil
+}
+
+func programPath(program *ast.NodeProgram) string {
+	path, err := filepath.Abs(program.Filename)
+	if err != nil {
+		return filepath.Clean(program.Filename)
+	}
+	return filepath.Clean(path)
 }
 
 func (g *Generator) createExitFunction() (llvm.Value, error) {
