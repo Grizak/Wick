@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.2.7] - 2026-11-03
+
+- Fix workflow (AGAIN)
+
 ## [v4.2.6] - 2026-11-03
 
 - Fix workflow (again)
