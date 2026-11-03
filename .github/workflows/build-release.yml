@@ -226,13 +226,6 @@ jobs:
       - name: Pull LFS objects from Forgejo
         run: |
           git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
-      - name: Clean musl toolchain (not needed on darwin)
-        shell: bash
-        run: |
-          echo "toolchains/musl/" >> .git/info/exclude
-          rm -rf toolchains/musl/
-          git checkout -- toolchains/ || true
-          git status --porcelain
       - name: Export LLVM link flags
         shell: bash
         run: |
