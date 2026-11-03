@@ -1,3 +1,5 @@
+import "math.wk"
+
 let sum = fn(upper: i64 = 10): i64 {
 	let sum = 0
 	for let k = 1; k <= upper; k = k + 1 {
@@ -7,6 +9,6 @@ let sum = fn(upper: i64 = 10): i64 {
 }
 
  // 1+2+3+4+5+6+7+8+9+10+11+12+13+14+15+16+17+18+19+20 = 210
-let s = sum(20)
+let s = math.divide(sum(20), 21)
 
-exit(s) // echo $? == 210
+exit(s) // echo $? == 10

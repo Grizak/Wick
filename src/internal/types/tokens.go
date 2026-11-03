@@ -11,6 +11,7 @@ const (
 	TokenOpenBrace    TokenType = "{"
 	TokenCloseBrace   TokenType = "}"
 	TokenComma        TokenType = ","
+	TokenDot          TokenType = "."
 	TokenIntLit       TokenType = "int_lit"
 	TokenFloatLit     TokenType = "float_lit"
 	TokenStringLit    TokenType = "string_lit"
@@ -40,6 +41,7 @@ const (
 	TokenContinue     TokenType = "continue"
 	TokenFunctionDecl TokenType = "fn"
 	TokenReturnStmt   TokenType = "return"
+	TokenImport       TokenType = "import"
 )
 
 type Token struct {
