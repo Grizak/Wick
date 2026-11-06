@@ -5,9 +5,7 @@ import (
 	"github.com/Grizak/Wick/src/internal/types"
 )
 
-func (p *Parser) parseIf() (*ast.NodeIf, error) {
-	pos := p.peek(0).Pos
-
+func (p *Parser) parseIf(pos types.Position) (*ast.NodeIf, error) {
 	condition, err := p.parseComparison()
 	if err != nil {
 		return nil, err
@@ -19,12 +17,21 @@ func (p *Parser) parseIf() (*ast.NodeIf, error) {
 	}
 
 	var elseBlock *ast.NodeBlock
-	if p.peek(0).Type == types.TokenElse {
-		p.consume()
+	if token, err := p.peek(0); err != nil {
+		return nil, err
+	} else if token.Type == types.TokenElse {
+		if _, err := p.consume(); err != nil {
+			return nil, err
+		}
 		// else if
-		if p.peek(0).Type == types.TokenIf {
-			p.consume()
-			elseIf, err := p.parseIf()
+		if token, err := p.peek(0); err != nil {
+			return nil, err
+		} else if token.Type == types.TokenIf {
+			ifTok, err := p.consume()
+			if err != nil {
+				return nil, err
+			}
+			elseIf, err := p.parseIf(ifTok.Pos)
 			if err != nil {
 				return nil, err
 			}

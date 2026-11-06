@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- General bugfixes
+
 ## [v4.3.0] - 2026-11-03
 
 - Implemented modules
