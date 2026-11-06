@@ -398,9 +398,10 @@ jobs:
       - name: Copy headers
         run: |
           root=src/internal/llvm/toolchain/include/windows_amd64
-          mkdir -p "$root/llvm" "$root/llvm-c"
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          cp -r llvm-project/lld/include/lld/. "$root/lld/"
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -563,9 +564,10 @@ jobs:
       - name: Copy headers
         run: |
           root=src/internal/llvm/toolchain/include/windows_arm64
-          mkdir -p "$root/llvm" "$root/llvm-c"
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          cp -r llvm-project/lld/include/lld/. "$root/lld/"
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
