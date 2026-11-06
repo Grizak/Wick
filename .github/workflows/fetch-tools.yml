@@ -77,6 +77,14 @@ jobs:
             sha1sum -c ../hashes/config.sub.3d5db9ebe860.sha1
           )
 
+      - name: Configure musl-cross-make for static builds
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cat > musl-cross-make/config.mak <<'EOF'
+          COMMON_CONFIG += CFLAGS="-g0 -O2" CXXFLAGS="-g0 -O2" LDFLAGS="-s -static"
+          EOF
+
       - name: Build musl toolchain (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -372,6 +380,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DCMAKE_C_COMPILER=gcc \
             -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
@@ -380,7 +389,8 @@ jobs:
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF
           cmake --build llvm-project/build
 
       - name: Copy headers
@@ -451,6 +461,22 @@ jobs:
             ls -la "$out" || true
             exit 1
           fi
+
+          set -euo pipefail
+          dump=objdump
+          for exe in src/internal/llvm/toolchain/bin/windows_*/lld-link.exe; do
+            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
+              case "${dll,,}" in
+                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
+                *) echo "$dll" ;;
+              esac
+            done)
+            if [ -n "$bad" ]; then
+              echo "Non-system DLL dependencies in $exe:"
+              echo "$bad"
+              exit 1
+            fi
+          done
 
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
@@ -528,7 +554,8 @@ jobs:
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF
           cmake --build llvm-project/build
 
       - name: Copy headers
@@ -599,6 +626,22 @@ jobs:
             ls -la "$out" || true
             exit 1
           fi
+
+          set -euo pipefail
+          dump=objdump
+          for exe in src/internal/llvm/toolchain/bin/windows_*/lld-link.exe; do
+            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
+              case "${dll,,}" in
+                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
+                *) echo "$dll" ;;
+              esac
+            done)
+            if [ -n "$bad" ]; then
+              echo "Non-system DLL dependencies in $exe:"
+              echo "$bad"
+              exit 1
+            fi
+          done
 
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
