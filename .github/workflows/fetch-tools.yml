@@ -251,6 +251,8 @@ jobs:
             "$OUT/include/$PLATFORM/llvm/"
           cp -R llvm-project/llvm/include/llvm-c/. \
             "$OUT/include/$PLATFORM/llvm-c/"
+          cp -R llvm-project/lld/include/lld/. \
+            "$OUT/include/$PLATFORM/lld/"
 
           # Include generated config headers, if present.
           if [ -d llvm-project/build/include/llvm ]; then
@@ -464,7 +466,7 @@ jobs:
 
           set -euo pipefail
           dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_*/lld-link.exe; do
+          for exe in src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe; do
             bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
               case "${dll,,}" in
                 kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
@@ -629,7 +631,7 @@ jobs:
 
           set -euo pipefail
           dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_*/lld-link.exe; do
+          for exe in src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe; do
             bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
               case "${dll,,}" in
                 kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
