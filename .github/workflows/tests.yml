@@ -1,0 +1,23 @@
+name: Test Wick
+on: # Must succeed before merging pull to master
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "src/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.26
+
+      - name: Run tests
+        run: |
+          go test -v ./src/...
