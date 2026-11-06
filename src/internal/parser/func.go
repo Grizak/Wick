@@ -6,14 +6,28 @@ import (
 )
 
 func (p *Parser) parseFuncDecl() (*ast.NodeFuncDecl, error) {
-	if p.peek(0).Type == types.TokenFunctionDecl {
-		p.consume()
+	start, err := p.peek(0)
+	if err != nil {
+		return nil, err
 	}
-	p.expect(types.TokenOpenParen)
+
+	if start.Type == types.TokenFunctionDecl {
+		if _, err := p.consume(); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := p.expect(types.TokenOpenParen); err != nil {
+		return nil, err
+	}
 
 	var params []ast.NodeParam
 
-	if p.peek(0).Type != types.TokenCloseParen {
+	token, err := p.peek(0)
+	if err != nil {
+		return nil, err
+	}
+	if token.Type != types.TokenCloseParen {
 		for {
 			decl, err := p.parseParam()
 			if err != nil {
@@ -21,30 +35,35 @@ func (p *Parser) parseFuncDecl() (*ast.NodeFuncDecl, error) {
 			}
 			params = append(params, *decl)
 
-			if ok, _ := p.tryConsume(types.TokenComma); ok {
-				continue
+			hasComma, err := p.tryConsume(types.TokenComma)
+			if err != nil {
+				return nil, err
 			}
-			break
-		}
-		if _, err := p.expect(types.TokenCloseParen); err != nil {
-			return nil, err
-		}
-	} else {
-		if _, err := p.expect(types.TokenCloseParen); err != nil {
-			return nil, err
+			if !hasComma {
+				break
+			}
 		}
 	}
 
-	// Optional return type: e.g. `: i64`
+	if _, err := p.expect(types.TokenCloseParen); err != nil {
+		return nil, err
+	}
+
 	var returnType *string
-	if p.peek(0).Type == types.TokenColon {
-		p.consume()
-		typeTok, err := p.expect(types.TokenIdent)
+	token, err = p.peek(0)
+	if err != nil {
+		return nil, err
+	}
+	if token.Type == types.TokenColon {
+		if _, err := p.consume(); err != nil {
+			return nil, err
+		}
+
+		typeName, err := p.parseType()
 		if err != nil {
 			return nil, err
 		}
-		name := typeTok.Value
-		returnType = name
+		returnType = &typeName
 	}
 
 	body, err := p.parseBlock()
@@ -56,19 +75,22 @@ func (p *Parser) parseFuncDecl() (*ast.NodeFuncDecl, error) {
 		Body:       *body,
 		Params:     params,
 		ReturnType: returnType,
-		Pos:        body.Pos,
+		Pos:        start.Pos,
 	}, nil
 }
 
 func (p *Parser) parseReturnStmt() (*ast.NodeReturn, error) {
-	p.expect(types.TokenReturnStmt)
+	token, err := p.expect(types.TokenReturnStmt)
+	if err != nil {
+		return nil, err
+	}
 
 	expr, err := p.parseExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	return &ast.NodeReturn{Expr: &expr, Pos: expr.Pos}, nil
+	return &ast.NodeReturn{Expr: &expr, Pos: token.Pos}, nil
 }
 
 func (p *Parser) parseParam() (*ast.NodeParam, error) {
@@ -78,7 +100,9 @@ func (p *Parser) parseParam() (*ast.NodeParam, error) {
 	}
 
 	var typeName *string
-	if p.peek(0).Type == types.TokenColon {
+	if token, err := p.peek(0); err != nil {
+		return nil, err
+	} else if token.Type == types.TokenColon {
 		if _, err := p.consume(); err != nil {
 			return nil, err
 		}
@@ -90,7 +114,9 @@ func (p *Parser) parseParam() (*ast.NodeParam, error) {
 	}
 
 	var defaultExpr *ast.NodeExpression
-	if p.peek(0).Type == types.TokenEquals {
+	if token, err := p.peek(0); err != nil {
+		return nil, err
+	} else if token.Type == types.TokenEquals {
 		if _, err := p.consume(); err != nil {
 			return nil, err
 		}

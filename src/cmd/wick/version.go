@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Grizak/Wick/src/internal/assets"
 	"github.com/spf13/cobra"
@@ -16,7 +17,7 @@ var versionCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Wick version %s\n\n", version)
 		// LICENSE
-		fmt.Println(assets.License[:len(assets.License)-1]) // Remove pending newline
+		fmt.Println(strings.TrimSuffix(assets.License, "\n")) // Remove pending newline
 		return nil
 	},
 }
