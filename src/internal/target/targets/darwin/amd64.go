@@ -7,7 +7,7 @@ func (t Darwin_Amd64) Conv() string {
 }
 
 func (t Darwin_Amd64) Triple() string {
-	return "aarch64-apple-darwin"
+	return "x86_64-apple-darwin"
 }
 
 func (t Darwin_Amd64) SysExit() string {
