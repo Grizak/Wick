@@ -385,6 +385,7 @@ jobs:
             mingw-w64-clang-x86_64-ninja
             mingw-w64-clang-x86_64-binutils
             mingw-w64-clang-x86_64-python
+            mingw-w64-clang-x86_64-sccache
 
       - name: Join tailnet
         uses: tailscale/github-action@v3
@@ -392,11 +393,6 @@ jobs:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
           tags: tag:ci
-
-      - name: Install sccache
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
 
       - name: Start sccache
         run: sccache --start-server
@@ -562,6 +558,7 @@ jobs:
             mingw-w64-clang-aarch64-ninja
             mingw-w64-clang-aarch64-binutils
             mingw-w64-clang-aarch64-python
+            mingw-w64-clang-aarch64-sccache
 
       - name: Join tailnet
         uses: tailscale/github-action@v3
@@ -569,11 +566,6 @@ jobs:
           oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
           tags: tag:ci
-
-      - name: Install sccache
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
 
       - name: Start sccache
         run: sccache --start-server
