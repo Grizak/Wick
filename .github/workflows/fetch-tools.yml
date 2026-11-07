@@ -8,6 +8,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  SCCACHE_BUCKET: sccache
+  SCCACHE_ENDPOINT: http://100.125.229.8:3900
+  SCCACHE_REGION: garage
+  SCCACHE_S3_USE_SSL: "off"
+  AWS_ACCESS_KEY_ID: ${{ secrets.GARAGE_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
   LLVM_VERSION: "20.1.8"
 
 jobs:
@@ -53,6 +61,21 @@ jobs:
             perl \
             zlib1g-dev
 
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
+
       - name: Clone musl-cross-make (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -83,6 +106,7 @@ jobs:
           set -euo pipefail
           cat > musl-cross-make/config.mak <<'EOF'
           COMMON_CONFIG += CFLAGS="-g0 -O2" CXXFLAGS="-g0 -O2" LDFLAGS="-s -static"
+          COMMON_CONFIG += CC="sccache gcc" CXX="sccache g++"
           EOF
 
       - name: Build musl toolchain (Linux)
@@ -349,17 +373,33 @@ jobs:
         with:
           lfs: false
 
-      - name: Setup MSYS2 (MinGW-w64)
+      - name: Setup MSYS2 (CLANG64)
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: CLANG64
           update: false
           install: >-
             git
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-binutils
+            mingw-w64-clang-x86_64-gcc
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-binutils
+            mingw-w64-clang-x86_64-python
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
 
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_amd64 src/internal/llvm/toolchain/lib/windows_amd64
@@ -373,15 +413,15 @@ jobs:
         uses: actions/cache@v5
         with:
           path: llvm-project/build
-          key: llvm-build-windows-amd64-mingw-${{ env.LLVM_VERSION }}
+          key: llvm-build-windows-amd64-clang-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
         run: |
           cmake -S llvm-project/llvm -B llvm-project/build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXE_LINKER_FLAGS="-static" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
@@ -522,6 +562,21 @@ jobs:
             mingw-w64-clang-aarch64-ninja
             mingw-w64-clang-aarch64-binutils
             mingw-w64-clang-aarch64-python
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
 
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_arm64 src/internal/llvm/toolchain/lib/windows_arm64
