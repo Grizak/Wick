@@ -107,9 +107,14 @@ jobs:
             mingw-w64-clang-x86_64-clang
             mingw-w64-clang-x86_64-binutils
             mingw-w64-clang-x86_64-lld
-      - name: Put MinGW on PATH
+      - name: Put Clang64 on PATH
         shell: pwsh
-        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\clang\bin"
+        run: |
+          $clangBin = "${{ steps.msys2.outputs.msys2-location }}\clang\bin"
+          Add-Content $env:GITHUB_PATH $clangBin
+          Add-Content $env:GITHUB_ENV "CC=$clangBin\clang.exe"
+          Add-Content $env:GITHUB_ENV "CXX=$clangBin\clang++.exe"
+
       - name: Export LLVM link flags
         shell: bash
         run: |
