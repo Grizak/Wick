@@ -110,7 +110,7 @@ jobs:
       - name: Put Clang64 on PATH
         shell: pwsh
         run: |
-          $clangBin = "${{ steps.msys2.outputs.msys2-location }}\clang\bin"
+          $clangBin = "${{ steps.msys2.outputs.msys2-location }}\clang64\bin"
           Add-Content $env:GITHUB_PATH $clangBin
           Add-Content $env:GITHUB_ENV "CC=$clangBin\clang.exe"
           Add-Content $env:GITHUB_ENV "CXX=$clangBin\clang++.exe"
