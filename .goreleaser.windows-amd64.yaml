@@ -13,8 +13,8 @@ builds:
     tags: [byollvm, llvm20]
     env:
       - CGO_ENABLED=1
-      - CC=clang
-      - CXX=clang++
+      - CC=${{ .Env.CC }}
+      - CXX=${{ .Env.CXX }}
       - "CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64 -flto"
       - "CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_amd64 -std=c++17 -flto"
       - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_WINDOWS_AMD64 }}
