@@ -8,6 +8,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  SCCACHE_BUCKET: sccache
+  SCCACHE_ENDPOINT: http://100.125.229.8:3900
+  SCCACHE_REGION: garage
+  SCCACHE_S3_USE_SSL: "off"
+  AWS_ACCESS_KEY_ID: ${{ secrets.GARAGE_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
   LLVM_VERSION: "20.1.8"
 
 jobs:
@@ -53,6 +61,21 @@ jobs:
             perl \
             zlib1g-dev
 
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
+
       - name: Clone musl-cross-make (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -76,6 +99,15 @@ jobs:
             cd musl-cross-make/sources
             sha1sum -c ../hashes/config.sub.3d5db9ebe860.sha1
           )
+
+      - name: Configure musl-cross-make for static builds
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cat > musl-cross-make/config.mak <<'EOF'
+          COMMON_CONFIG += CFLAGS="-g0 -O2" CXXFLAGS="-g0 -O2" LDFLAGS="-s -static"
+          COMMON_CONFIG += CC="sccache gcc" CXX="sccache g++"
+          EOF
 
       - name: Build musl toolchain (Linux)
         if: runner.os == 'Linux'
@@ -207,7 +239,10 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
-            -DCMAKE_EXE_LINKER_FLAGS="-static"
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
           ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
 
@@ -228,7 +263,10 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
+
           ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Copy headers
@@ -243,6 +281,8 @@ jobs:
             "$OUT/include/$PLATFORM/llvm/"
           cp -R llvm-project/llvm/include/llvm-c/. \
             "$OUT/include/$PLATFORM/llvm-c/"
+          cp -R llvm-project/lld/include/lld/. \
+            "$OUT/include/$PLATFORM/lld/"
 
           # Include generated config headers, if present.
           if [ -d llvm-project/build/include/llvm ]; then
@@ -339,17 +379,29 @@ jobs:
         with:
           lfs: false
 
-      - name: Setup MSYS2 (MinGW-w64)
+      - name: Setup MSYS2 (CLANG64)
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: CLANG64
           update: false
           install: >-
             git
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-binutils
+            mingw-w64-clang-x86_64-gcc
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-binutils
+            mingw-w64-clang-x86_64-python
+            mingw-w64-clang-x86_64-sccache
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Start sccache
+        run: sccache --start-server
 
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_amd64 src/internal/llvm/toolchain/lib/windows_amd64
@@ -363,15 +415,16 @@ jobs:
         uses: actions/cache@v5
         with:
           path: llvm-project/build
-          key: llvm-build-windows-amd64-mingw-${{ env.LLVM_VERSION }}
+          key: llvm-build-windows-amd64-clang-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
         run: |
           cmake -S llvm-project/llvm -B llvm-project/build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
@@ -380,15 +433,21 @@ jobs:
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+
           cmake --build llvm-project/build
 
       - name: Copy headers
         run: |
           root=src/internal/llvm/toolchain/include/windows_amd64
-          mkdir -p "$root/llvm" "$root/llvm-c"
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          cp -r llvm-project/lld/include/lld/. "$root/lld/"
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -452,6 +511,22 @@ jobs:
             exit 1
           fi
 
+          set -euo pipefail
+          dump=objdump
+          for exe in src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe; do
+            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
+              case "${dll,,}" in
+                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
+                *) echo "$dll" ;;
+              esac
+            done)
+            if [ -n "$bad" ]; then
+              echo "Non-system DLL dependencies in $exe:"
+              echo "$bad"
+              exit 1
+            fi
+          done
+
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
 
@@ -493,6 +568,17 @@ jobs:
             mingw-w64-clang-aarch64-ninja
             mingw-w64-clang-aarch64-binutils
             mingw-w64-clang-aarch64-python
+            mingw-w64-clang-aarch64-sccache
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Start sccache
+        run: sccache --start-server
 
       - name: Cleanup
         run: rm -rf src/internal/llvm/toolchain/bin/windows_arm64 src/internal/llvm/toolchain/lib/windows_arm64
@@ -528,15 +614,21 @@ jobs:
             -DLLVM_ENABLE_PROJECTS=lld \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+
           cmake --build llvm-project/build
 
       - name: Copy headers
         run: |
           root=src/internal/llvm/toolchain/include/windows_arm64
-          mkdir -p "$root/llvm" "$root/llvm-c"
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          cp -r llvm-project/lld/include/lld/. "$root/lld/"
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -599,6 +691,22 @@ jobs:
             ls -la "$out" || true
             exit 1
           fi
+
+          set -euo pipefail
+          dump=objdump
+          for exe in src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe; do
+            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
+              case "${dll,,}" in
+                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
+                *) echo "$dll" ;;
+              esac
+            done)
+            if [ -n "$bad" ]; then
+              echo "Non-system DLL dependencies in $exe:"
+              echo "$bad"
+              exit 1
+            fi
+          done
 
       - name: Strip binaries
         run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe

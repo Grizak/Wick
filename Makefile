@@ -1,4 +1,4 @@
-.PHONY: release snapshot build build-darwin clean check package dev
+.PHONY: release snapshot build build-darwin clean check package dev test
 
 DEV_OUT ?= ./dist/wick
 ROOT := $(CURDIR)
@@ -25,12 +25,21 @@ dev:
 	CC=$(MUSL_CC) \
 	CXX=$(MUSL_CXX) \
 	CGO_ENABLED=1 \
-	CGO_CFLAGS="-I$(LLVM_INCLUDE)" \
-	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17" \
+	CGO_CFLAGS="-I$(LLVM_INCLUDE) -ffunction-sections -fdata-sections -flto" \
+	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
 	go build -tags "byollvm llvm20" \
 	-ldflags "-X main.version=$(version) -linkmode=external -extldflags=-static" \
 	-o "$(DEV_OUT)" ./src/cmd/wick
+
+test:
+	CC=gcc \
+	CXX=g++ \
+	CGO_ENABLED=1 \
+	CGO_CFLAGS="-I$(LLVM_INCLUDE) -ffunction-sections -fdata-sections -flto" \
+	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
+	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
+	go test -tags "byollvm llvm20" -v ./src/...
 
 release:
 	goreleaser release --clean

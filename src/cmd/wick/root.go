@@ -1,9 +1,8 @@
 package main
 
 import (
-	"runtime"
+	"strings"
 
-	"github.com/Grizak/Wick/src/internal/compiler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -19,23 +18,7 @@ var rootCmd = &cobra.Command{
 	// for backwards compatibility with older versions of the compiler and convenience
 	Args: cobra.MinimumNArgs(1),
 
-	RunE: func(cmd *cobra.Command, args []string) error {
-		target := viper.GetString("target")
-
-		if target == "" {
-			target = runtime.GOOS + "/" + runtime.GOARCH
-		}
-
-		return compiler.Build(
-			compiler.BuildOptions{
-				Input:              args,
-				Output:             viper.GetString("output"),
-				SaveIntermediaries: viper.GetBool("save-intermediaries"),
-				Target:             target,
-				Opt:                viper.GetInt("optimization"),
-			},
-		)
-	},
+	RunE: runBuild,
 }
 
 func Execute() error {
@@ -44,6 +27,7 @@ func Execute() error {
 
 func init() {
 	viper.SetEnvPrefix("WICK")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	flags := rootCmd.PersistentFlags()
