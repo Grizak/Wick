@@ -39,7 +39,7 @@ test:
 	CGO_CFLAGS="-I$(LLVM_INCLUDE) -ffunction-sections -fdata-sections -flto" \
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
-	go test -v ./src/...
+	go test -tags "byollvm llvm20" -v ./src/...
 
 release:
 	goreleaser release --clean
