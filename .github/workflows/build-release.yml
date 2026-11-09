@@ -104,8 +104,8 @@ jobs:
           msystem: CLANG64
           update: false
           install: >-
-            mingw-clang-x86_64-clang
-            mingw-w64-x86_64-binutils
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-binutils
       - name: Put MinGW on PATH
         shell: pwsh
         run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\clang\bin"
