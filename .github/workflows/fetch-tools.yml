@@ -239,7 +239,10 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
-            -DCMAKE_EXE_LINKER_FLAGS="-static"
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
           ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
 
@@ -260,7 +263,11 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+
           ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Copy headers
@@ -428,7 +435,11 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
-            -DLLVM_ENABLE_LIBXML2=OFF
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+
           cmake --build llvm-project/build
 
       - name: Copy headers
@@ -605,7 +616,11 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
-            -DLLVM_ENABLE_LIBXML2=OFF
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+
           cmake --build llvm-project/build
 
       - name: Copy headers
