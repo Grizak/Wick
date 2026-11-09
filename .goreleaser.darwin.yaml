@@ -21,7 +21,7 @@ builds:
     ldflags:
       - "-s -w"
       - "-X main.version=v{{ .Version }}"
-      #- '-extldflags="-Wl,-dead-strip"'
+      - '-extldflags="-Wl,-dead_strip"'
 
 archives:
   - id: darwin-archives
