@@ -101,14 +101,14 @@ jobs:
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
-          msystem: MINGW64
+          msystem: CLANG64
           update: false
           install: >-
-            mingw-w64-x86_64-gcc
+            mingw-clang-x86_64-clang
             mingw-w64-x86_64-binutils
       - name: Put MinGW on PATH
         shell: pwsh
-        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\mingw64\bin"
+        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\clang\bin"
       - name: Export LLVM link flags
         shell: bash
         run: |
