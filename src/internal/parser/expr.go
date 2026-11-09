@@ -9,7 +9,11 @@ import (
 )
 
 func (p *Parser) parseComparison() (ast.NodeExpression, error) {
-	if p.peek(0).Type == types.TokenFunctionDecl || p.peek(0).Type == types.TokenOpenParen {
+	token, err := p.peek(0)
+	if err != nil {
+		return ast.NodeExpression{}, err
+	}
+	if token.Type == types.TokenFunctionDecl {
 		funcDecl, err := p.parseFuncDecl()
 		if err != nil {
 			return ast.NodeExpression{}, err
@@ -25,147 +29,137 @@ func (p *Parser) parseComparison() (ast.NodeExpression, error) {
 		return ast.NodeExpression{}, err
 	}
 
-	switch p.peek(0).Type {
-	case types.TokenEqEq:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpEq, Right: right}}, nil
-	case types.TokenNotEq:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpNotEq, Right: right}}, nil
-	case types.TokenLt:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpLt, Right: right}}, nil
-	case types.TokenGt:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpGt, Right: right}}, nil
-	case types.TokenLtEq:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpLtEq, Right: right}}, nil
-	case types.TokenGtEq:
-		p.consume()
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{BinExpr: &ast.NodeBinExpr{Left: left, Op: types.BinOpGtEq, Right: right}}, nil
+	token, err = p.peek(0)
+	if err != nil {
+		return ast.NodeExpression{}, err
 	}
 
-	return left, nil
+	var op types.BinOp
+	switch token.Type {
+	case types.TokenEqEq:
+		op = types.BinOpEq
+	case types.TokenNotEq:
+		op = types.BinOpNotEq
+	case types.TokenLt:
+		op = types.BinOpLt
+	case types.TokenGt:
+		op = types.BinOpGt
+	case types.TokenLtEq:
+		op = types.BinOpLtEq
+	case types.TokenGtEq:
+		op = types.BinOpGtEq
+	default:
+		return left, nil
+	}
+
+	if _, err := p.consume(); err != nil {
+		return ast.NodeExpression{}, err
+	}
+
+	right, err := p.parseExpression()
+	if err != nil {
+		return ast.NodeExpression{}, err
+	}
+
+	return ast.NodeExpression{
+		BinExpr: &ast.NodeBinExpr{
+			Left:  left,
+			Op:    op,
+			Right: right,
+			Pos:   left.Pos,
+		},
+	}, nil
 }
 
 func (p *Parser) parseExpression() (ast.NodeExpression, error) {
-	term, err := p.parseTerm()
+	left, err := p.parseTerm()
 	if err != nil {
 		return ast.NodeExpression{}, err
 	}
 
-	switch p.peek(0).Type {
-	case types.TokenPlus:
-		_, err := p.consume()
+	for {
+		token, err := p.peek(0)
 		if err != nil {
 			return ast.NodeExpression{}, err
 		}
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{
-			BinExpr: &ast.NodeBinExpr{
-				Left:  term,
-				Op:    types.BinOpAdd,
-				Right: right,
-				Pos:   term.Pos,
-			},
-		}, nil
-	case types.TokenMinus:
-		_, err := p.consume()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		right, err := p.parseExpression()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{
-			BinExpr: &ast.NodeBinExpr{
-				Left:  term,
-				Op:    types.BinOpSub,
-				Right: right,
-				Pos:   term.Pos,
-			},
-		}, nil
-	}
 
-	return term, nil
+		var op types.BinOp
+		switch token.Type {
+		case types.TokenPlus:
+			op = types.BinOpAdd
+		case types.TokenMinus:
+			op = types.BinOpSub
+		default:
+			return left, nil
+		}
+
+		if _, err := p.consume(); err != nil {
+			return ast.NodeExpression{}, err
+		}
+
+		right, err := p.parseTerm()
+		if err != nil {
+			return ast.NodeExpression{}, err
+		}
+
+		left = ast.NodeExpression{
+			BinExpr: &ast.NodeBinExpr{
+				Left:  left,
+				Op:    op,
+				Right: right,
+				Pos:   left.Pos,
+			},
+		}
+	}
 }
 
 func (p *Parser) parseTerm() (ast.NodeExpression, error) {
-	factor, err := p.parseFactor()
+	left, err := p.parseFactor()
 	if err != nil {
 		return ast.NodeExpression{}, err
 	}
 
-	switch p.peek(0).Type {
-	case types.TokenStar:
-		_, err := p.consume()
+	for {
+		token, err := p.peek(0)
 		if err != nil {
 			return ast.NodeExpression{}, err
 		}
-		right, err := p.parseTerm()
+
+		var op types.BinOp
+		switch token.Type {
+		case types.TokenStar:
+			op = types.BinOpMul
+		case types.TokenFSlash:
+			op = types.BinOpDiv
+		default:
+			return left, nil
+		}
+
+		if _, err := p.consume(); err != nil {
+			return ast.NodeExpression{}, err
+		}
+
+		right, err := p.parseFactor()
 		if err != nil {
 			return ast.NodeExpression{}, err
 		}
-		return ast.NodeExpression{
+
+		left = ast.NodeExpression{
 			BinExpr: &ast.NodeBinExpr{
-				Left:  factor,
-				Op:    types.BinOpMul,
+				Left:  left,
+				Op:    op,
 				Right: right,
-				Pos:   factor.Pos,
+				Pos:   left.Pos,
 			},
-		}, nil
-	case types.TokenFSlash:
-		_, err := p.consume()
-		if err != nil {
-			return ast.NodeExpression{}, err
 		}
-		right, err := p.parseTerm()
-		if err != nil {
-			return ast.NodeExpression{}, err
-		}
-		return ast.NodeExpression{
-			BinExpr: &ast.NodeBinExpr{
-				Left:  factor,
-				Op:    types.BinOpDiv,
-				Right: right,
-				Pos:   factor.Pos,
-			},
-		}, nil
 	}
-	return factor, nil
 }
 
 func (p *Parser) parseFactor() (ast.NodeExpression, error) {
-	token := p.peek(0)
+	token, err := p.peek(0)
+	if err != nil {
+		return ast.NodeExpression{}, err
+	}
 
 	if token.Type == types.TokenOpenParen {
 		_, err := p.consume()
@@ -190,7 +184,9 @@ func (p *Parser) parseFactor() (ast.NodeExpression, error) {
 		}
 		module := ""
 		name := *token.Value
-		if p.peek(0).Type == types.TokenDot {
+		if token, err := p.peek(0); err != nil {
+			return ast.NodeExpression{}, err
+		} else if token.Type == types.TokenDot {
 			_, err := p.consume()
 			if err != nil {
 				return ast.NodeExpression{}, err
@@ -203,20 +199,26 @@ func (p *Parser) parseFactor() (ast.NodeExpression, error) {
 			name = *member.Value
 		}
 		// Check if this is a function call
-		if p.peek(0).Type == types.TokenOpenParen {
+		if token, err := p.peek(0); err != nil {
+			return ast.NodeExpression{}, err
+		} else if token.Type == types.TokenOpenParen {
 			_, err := p.consume() // consume (
 			if err != nil {
 				return ast.NodeExpression{}, err
 			}
 			var args []ast.NodeExpression
-			if p.peek(0).Type != types.TokenCloseParen {
+			if token, err := p.peek(0); err != nil {
+				return ast.NodeExpression{}, err
+			} else if token.Type != types.TokenCloseParen {
 				for {
 					arg, err := p.parseExpression()
 					if err != nil {
 						return ast.NodeExpression{}, err
 					}
 					args = append(args, arg)
-					if p.peek(0).Type != types.TokenComma {
+					if token, err := p.peek(0); err != nil {
+						return ast.NodeExpression{}, err
+					} else if token.Type != types.TokenComma {
 						break
 					}
 					_, err = p.consume() // consume comma

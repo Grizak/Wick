@@ -11,8 +11,13 @@ import (
 func (p *Parser) parseType() (string, error) {
 	var typeStr strings.Builder
 
+	token, err := p.peek(0)
+	if err != nil {
+		return "", err
+	}
+
 	// Handle pointer types
-	for p.peek(0).Type == types.TokenStar {
+	for token.Type == types.TokenStar {
 		_, err := p.consume()
 		if err != nil {
 			return "", err
@@ -21,12 +26,17 @@ func (p *Parser) parseType() (string, error) {
 	}
 
 	// Handle array types
-	if p.peek(0).Type == types.TokenOpenBracket {
+	if token, err := p.peek(0); err != nil {
+		return "", err
+	} else if token.Type == types.TokenOpenBracket {
 		_, err := p.consume()
 		if err != nil {
 			return "", err
 		}
-		lenToken := p.peek(0)
+		lenToken, err := p.peek(0)
+		if err != nil {
+			return "", err
+		}
 		if lenToken.Type != types.TokenIntLit {
 			return "", p.error("expected array length", lenToken)
 		}
@@ -44,7 +54,10 @@ func (p *Parser) parseType() (string, error) {
 	}
 
 	// Parse base type
-	token := p.peek(0)
+	token, err = p.peek(0)
+	if err != nil {
+		return "", err
+	}
 	switch token.Type {
 	case types.TokenIdent:
 		_, err := p.consume()

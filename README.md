@@ -26,13 +26,13 @@ Download the latest release for your platform from the [releases page](https://g
 
 ```bash
 # Compile a file
-wickc input.wi -o output
+wick input.wi -o output
 
 # Cross-compile to a specific target
-wickc input.wi -o output -t linux/amd64
+wick input.wi -o output -t linux/amd64
 
 # Save intermediary files (.ll, .asm and .o)
-wickc input.wi -o output -s
+wick input.wi -o output -s
 ```
 
 ## Supported Hosts

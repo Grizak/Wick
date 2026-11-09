@@ -9,22 +9,23 @@ import (
 )
 
 var changelogCmd = &cobra.Command{
-	Use:   "changelog <version>",
+	Use:   "changelog [version]",
 	Short: "Print the changelog of Wick",
-	Run: func(cmd *cobra.Command, args []string) {
-		var v string
-		if len(args) < 1 {
-			v = version
-		} else {
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		v := version
+		if len(args) == 1 {
 			v = args[0]
 		}
+
 		changelog, err := assets.Changelog.ReadFile(fmt.Sprintf("changelog/%s.md", v))
 		if err != nil {
-			fmt.Println("Error reading changelog:", err)
-			return
+			return fmt.Errorf("read changelog for %q: %w", v, err)
 		}
+
 		fmt.Printf("%s:\n", v)
 		utils.PrintMd(string(changelog))
+		return nil
 	},
 }
 
