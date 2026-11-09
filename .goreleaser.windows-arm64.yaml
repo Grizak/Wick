@@ -15,8 +15,8 @@ builds:
       - CGO_ENABLED=1
       - CC=clang
       - CXX=clang++
-      - "CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -flto -Wl,--gc-sections"
-      - "CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -std=c++17 -flto -Wl,--gc-sections"
+      - "CGO_CFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -flto"
+      - "CGO_CXXFLAGS=-I{{ .Env.PROJECT_ROOT }}/src/internal/llvm/toolchain/include/windows_arm64 -std=c++17 -flto"
       - CGO_LDFLAGS={{ .Env.LLVM_LDFLAGS_WINDOWS_ARM64 }}
     ldflags:
       - "-s -w"
