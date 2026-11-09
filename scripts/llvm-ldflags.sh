@@ -31,18 +31,18 @@ fi
 case "$platform" in
   linux_*)
     # The g++ driver adds -lstdc++ itself, so it's not listed here.
-    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static-libstdc++ -static-libgcc -lm -ldl -pthread"
+    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static-libstdc++ -static-libgcc -lm -ldl -pthread -flto -Wl,--gc-sections"
     ;;
   windows_amd64)
-    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static-libgcc -static-libstdc++ -lwinpthread -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32"
+    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static-libgcc -static-libstdc++ -lwinpthread -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32 -flto -Wl,--gc-sections"
     ;;
   windows_arm64)
-    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static -static-libgcc -static-libstdc++ -lwinpthread -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32"
+    echo "-L$dir -Wl,--start-group ${libs[*]} -Wl,--end-group -static -static-libgcc -static-libstdc++ -lwinpthread -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lntdll -lws2_32 -flto -Wl,--gc-sections"
     ;;
   darwin_*)
     # ld64 has no --start-group. Order matters, so if you see undefined
     # symbols, add -Wl,-all_load here.
-    echo "-L$dir ${libs[*]} -lc++ -lm"
+    echo "-L$dir ${libs[*]} -lc++ -lm -Wl,-dead-symbols"
     ;;
   *)
     echo "unknown platform: $platform" >&2
