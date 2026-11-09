@@ -33,8 +33,8 @@ dev:
 	-o "$(DEV_OUT)" ./src/cmd/wick
 
 test:
-	CC=$(MUSL_CC) \
-	CXX=$(MUSL_CXX) \
+	CC=gcc \
+	CXX=g++ \
 	CGO_ENABLED=1 \
 	CGO_CFLAGS="-I$(LLVM_INCLUDE) -ffunction-sections -fdata-sections -flto" \
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
