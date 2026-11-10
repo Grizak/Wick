@@ -28,6 +28,7 @@ type BuildOptions struct {
 	SaveIntermediaries bool
 	Target             string
 	Opt                int
+	Ldflags            []string
 }
 
 func Build(opts BuildOptions) error {
@@ -59,7 +60,7 @@ func Build(opts BuildOptions) error {
 		return err
 	}
 
-	linker.Link(objects, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target])
+	linker.Link(objects, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target], opts.Ldflags)
 
 	return nil
 }

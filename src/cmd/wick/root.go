@@ -36,11 +36,13 @@ func init() {
 	flags.BoolP("save-intermediaries", "s", false, "Save intermediary files")
 	flags.StringP("target", "t", "", "Compilation target (default: same as host, can also be set via WICK_TARGET environment variable)")
 	flags.IntP("optimization", "O", 0, "Optimization level (0-3)")
+	flags.String("ldflags", "", "Linker flags")
 
 	viper.BindPFlag("output", flags.Lookup("output"))
 	viper.BindPFlag("save-intermediaries", flags.Lookup("save-intermediaries"))
 	viper.BindPFlag("target", flags.Lookup("target"))
 	viper.BindPFlag("optimization", flags.Lookup("optimization"))
+	viper.BindPFlag("ldflags", flags.Lookup("ldflags"))
 
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
 }
