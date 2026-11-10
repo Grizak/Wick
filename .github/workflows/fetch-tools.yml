@@ -117,7 +117,7 @@ jobs:
           make -C musl-cross-make \
             TARGET="${{ matrix.musl_target }}" \
             OUTPUT="$RUNNER_TEMP/musl-toolchain" \
-            -j"$(nproc)" \
+            -j1 \
             install
 
           TOOLCHAIN="$RUNNER_TEMP/musl-toolchain/bin"
