@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added **--ldflags**
+
 ## [v4.3.1] - 2026-11-09
 
 - Do lto for wick binary itself

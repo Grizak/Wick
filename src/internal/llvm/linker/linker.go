@@ -3,28 +3,25 @@ package linker
 import (
 	"fmt"
 	"os"
-	"runtime"
-
-	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 )
 
-func Link(objFiles []string, outFile string, save bool, target string) error {
-	lldPath := toolchain.LldPath()
-
+func Link(objFiles []string, outFile string, save bool, target string, ldflags []string) error {
 	var args []string
-	if runtime.GOOS == "windows" {
-		args = append(args,
-			"/out:"+outFile,
-		)
-		if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
-			args = append(args, "/subsystem:console", "kernel32.lib", "/libpath:"+toolchain.LldCacheDir())
+	if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
+		var kernel32 string
+		if target == "x86_64-pc-windows-msvc" {
+			kernel32 = "kernel32.amd64.lib"
+		} else if target == "aarch64-pc-windows-msvc" {
+			kernel32 = "kernel32.arm64.lib"
 		}
+
+		// Windows args
 	} else {
-		args = append(args, "-o", outFile)
+		// GNU args
 	}
 	args = append(args, objFiles...)
 
-	err := toolchain.ExecuteCommand(lldPath, args...)
+	err := internalLink(target, args)
 
 	if !save && err == nil {
 		for _, objFile := range objFiles {
