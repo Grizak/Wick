@@ -22,6 +22,8 @@ This project is actively maintained by me (Grizak) on my [youtube channel](https
 
 Download the latest release for your platform from the [releases page](https://github.com/Grizak/Wick/releases).
 
+If you're on windows, it might say "missing dll dependency" or "The program cannot execute because [some filename] couldn't be found", in that case, you should install the [Microsoft Visual C++ Redistributable for Visual Studio](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) (latest version) and try again.
+
 ## Usage
 
 ```bash
