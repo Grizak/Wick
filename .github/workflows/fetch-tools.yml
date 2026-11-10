@@ -3,10 +3,6 @@ name: Fetch Tools
 on:
   workflow_dispatch:
 
-concurrency:
-  group: fetch-tools
-  cancel-in-progress: true
-
 env:
   SCCACHE_BUCKET: sccache
   SCCACHE_ENDPOINT: http://100.125.229.8:3900
