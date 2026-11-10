@@ -3,8 +3,6 @@ on: # Must succeed before merging pull to master
   pull_request:
     branches:
       - master
-    paths:
-      - "src/**"
 
 jobs:
   test:
