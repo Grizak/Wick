@@ -1,34 +1,40 @@
 package linker
 
 /*
-#include "linker.h"
+#include <stdlib.h>
+#include "lld_bridge.h"
 */
 import "C"
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
 
-func internalLink(target string, args []string) error {
-	var err error
-	switch target {
-	case "x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc":
-		err = linkCOFFBinary(args)
-	case "x86_64-pc-linux-gnu", "aarch64-pc-linux-gnu":
-		err = linkELFBinary(args)
-	case "x86_64-apple-darwin", "aarch64-apple-darwin":
-		err = linkMachOBinary(args)
-	default:
-		err = fmt.Errorf("Unsupported target")
+	"github.com/Grizak/Wick/src/internal/target"
+)
+
+func internalLink(targetTriple string, args []string) error {
+	args, err := pushTarget(target.BinaryFormat[targetTriple], args)
+	if err != nil {
+		return err
 	}
-	return err
-}
+	cargs := make([]*C.char, len(args))
+	for i, arg := range args {
+		cargs[i] = C.CString(arg)
+		defer C.free(unsafe.Pointer(cargs[i]))
+	}
 
-func linkCOFFBinary(args []string) error {
+	var argv **C.char
+	if len(cargs) > 0 {
+		argv = (**C.char)(unsafe.Pointer(&cargs[0]))
+	}
+
+	code := C.Run_lld(C.int(len(cargs)), argv)
+	if code != 0 {
+		return fmt.Errorf("lld failed with code %d", int(code))
+	}
 	return nil
 }
 
-func linkELFBinary(args []string) error {
-	return nil
-}
-
-func linkMachOBinary(args []string) error {
-	return nil
+func ExternalLink(targetTriple string, args []string) error {
+	return internalLink(targetTriple, args)
 }

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/Grizak/Wick/src/internal/lexer"
@@ -75,11 +74,6 @@ func validateConfig(opts BuildOptions) error {
 func validateTarget(host, targetName string) error {
 	if _, ok := target.TargetTriples[targetName]; !ok {
 		return fmt.Errorf("unsupported target %q", targetName)
-	}
-
-	// Windows can only be targeted from Windows.
-	if strings.HasPrefix(targetName, "windows/") && host != "windows" {
-		return fmt.Errorf("cross-compiling to Windows is not currently supported")
 	}
 
 	return nil

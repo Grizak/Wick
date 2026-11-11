@@ -1,19 +1,29 @@
 package toolchain
 
 import (
-	"encoding/json"
+	_ "embed"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 )
 
-var tmpDir string
+//go:embed bin/windows_amd64/kernel32.lib
+var kernel32Amd64Lib []byte
 
-var versions map[string]string
+//go:embed bin/windows_arm64/kernel32.lib
+var kernel32Arm64Lib []byte
+
+func CacheDir() (string, error) {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(base, "wick", "tools")
+	return dir, nil
+}
 
 func Init() error {
-	dir, err := cacheDir()
+	dir, err := CacheDir()
 	if err != nil {
 		return err
 	}
@@ -22,10 +32,8 @@ func Init() error {
 		return err
 	}
 
-	tmpDir = dir
-
-	versions = make(map[string]string)
-	if err := json.Unmarshal(versionsJSON, &versions); err != nil {
+	cache, err := Kernel32CacheDir()
+	if err != nil {
 		return err
 	}
 
@@ -34,9 +42,8 @@ func Init() error {
 		name string
 		data []byte
 	}{
-		{LldCacheDir(), LldBinaryName(), lldBinary},
-		{LldCacheDir(), "kernel32.amd64.lib", kernel32Amd64Lib},
-		{LldCacheDir(), "kernel32.arm64.lib", kernel32Arm64Lib},
+		{cache, "kernel32.amd64.lib", kernel32Amd64Lib},
+		{cache, "kernel32.arm64.lib", kernel32Arm64Lib},
 	} {
 		path := filepath.Join(b.dir, b.name)
 		if _, err := os.Stat(path); err == nil {
@@ -52,45 +59,10 @@ func Init() error {
 	return nil
 }
 
-func LldCacheDir() string {
-	return filepath.Join(tmpDir, "lld-"+versions["lld"])
-}
-
-func LldPath() string {
-	return filepath.Join(LldCacheDir(), LldBinaryName())
-}
-
-func LldBinaryName() string {
-	switch runtime.GOOS {
-	case "windows":
-		return "lld-link.exe"
-	case "darwin":
-		return "ld64.lld"
-	default:
-		return "ld.lld"
-	}
-}
-
-func ExecuteCommand(name string, args ...string) error {
-	c := exec.Command(name, args...)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-
-	err := c.Run()
-
-	if err != nil {
-		println("ERR:", err.Error())
-	}
-
-	return err
-}
-
-func cacheDir() (string, error) {
-	base, err := os.UserCacheDir()
+func Kernel32CacheDir() (string, error) {
+	dir, err := CacheDir()
 	if err != nil {
 		return "", err
 	}
-
-	dir := filepath.Join(base, "wick", "tools")
-	return dir, nil
+	return filepath.Join(dir, "kernel32"), nil
 }
