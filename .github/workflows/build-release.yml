@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/${{ matrix.platform }},src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
+        run: git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
       - name: Export LLVM link flags
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -94,7 +94,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean
@@ -168,7 +168,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean
@@ -235,7 +235,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean
