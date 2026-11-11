@@ -210,13 +210,6 @@ jobs:
             --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
             https://github.com/llvm/llvm-project.git
 
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}-musl
-
       - name: Build LLVM libraries and lld (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -357,13 +350,6 @@ jobs:
       - name: Clone LLVM
         run: |
           git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
-
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-windows-amd64-clang-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
         run: |
@@ -512,13 +498,6 @@ jobs:
       - name: Clone LLVM
         run: |
           git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
-
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-windows-arm64-mingw-${{ env.LLVM_VERSION }}
 
       - name: Build LLVM libraries and lld
         run: |
