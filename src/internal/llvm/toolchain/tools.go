@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 )
 
-//go:embed bin/windows_amd64/kernel32.lib
+//go:embed libc/windows_amd64/kernel32.lib
 var kernel32Amd64Lib []byte
 
-//go:embed bin/windows_arm64/kernel32.lib
+//go:embed libc/windows_arm64/kernel32.lib
 var kernel32Arm64Lib []byte
 
 func CacheDir() (string, error) {
