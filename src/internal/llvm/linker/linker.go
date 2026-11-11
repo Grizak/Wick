@@ -29,7 +29,7 @@ func Link(objFiles []string, outFile string, save bool, target string, ldflags [
 		args = append(args, "/ENTRY:main")
 		args = append(args, "/SUBSYSTEM:CONSOLE")
 		args = append(args, fmt.Sprintf("/MACHINE:%s", machine))
-		args = append(args, fmt.Sprintf("/LIBPATH:", cache))
+		args = append(args, fmt.Sprintf("/LIBPATH:%s", cache))
 		args = append(args, kernel32)
 	} else {
 		args = append(args, "-o", outFile)

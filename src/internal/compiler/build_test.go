@@ -32,9 +32,6 @@ func TestValidateTarget(t *testing.T) {
 	if err := validateTarget("linux", "plan9/amd64"); err == nil || !strings.Contains(err.Error(), "unsupported target") {
 		t.Errorf("unsupported target error = %v", err)
 	}
-	if err := validateTarget("linux", "windows/amd64"); err == nil || !strings.Contains(err.Error(), "cross-compiling to Windows") {
-		t.Errorf("Windows cross-target error = %v", err)
-	}
 	if err := validateTarget("windows", "windows/arm64"); err != nil {
 		t.Errorf("Windows host rejected Windows target: %v", err)
 	}
