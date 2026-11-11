@@ -453,7 +453,7 @@ jobs:
           name: windows-amd64-tools
           if-no-files-found: error
           path: |
-            src/internal/llvm/toolchain/bin/windows_amd64/
+            src/internal/llvm/toolchain/libc/windows_amd64/
             src/internal/llvm/toolchain/lib/windows_amd64/
             src/internal/llvm/toolchain/include/windows_amd64/
 
@@ -605,7 +605,7 @@ jobs:
           name: windows-arm64-tools
           if-no-files-found: error
           path: |
-            src/internal/llvm/toolchain/bin/windows_arm64/
+            src/internal/llvm/toolchain/libc/windows_arm64/
             src/internal/llvm/toolchain/lib/windows_arm64/
             src/internal/llvm/toolchain/include/windows_arm64/
 
