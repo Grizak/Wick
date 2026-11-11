@@ -17,6 +17,15 @@ var TargetTriples = map[string]string{
 	"windows/arm64": "aarch64-pc-windows-msvc",
 }
 
+var BinaryFormat = map[string]string{
+	"x86_64-pc-linux-gnu":     "elf",
+	"aarch64-pc-linux-gnu":    "elf",
+	"x86_64-apple-darwin":     "macho",
+	"aarch64-apple-darwin":    "macho",
+	"x86_64-pc-windows-msvc":  "coff",
+	"aarch64-pc-windows-msvc": "coff",
+}
+
 type Target interface {
 	SysExit() string
 	Conv() string

@@ -2,6 +2,7 @@ package main
 
 import (
 	"runtime"
+	"strings"
 
 	"github.com/Grizak/Wick/src/internal/compiler"
 	"github.com/spf13/cobra"
@@ -34,6 +35,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 			SaveIntermediaries: viper.GetBool("save-intermediaries"),
 			Target:             target,
 			Opt:                viper.GetInt("optimization"),
+			Ldflags:            strings.Split(viper.GetString("ldflags"), " "),
 		},
 	)
 }
