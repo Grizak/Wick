@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [v4.4.0] - 2026-11-11
+
+- Added **--ldflags**
+- Added in-house linking and a dedicated link command
+
 ## [v4.3.1] - 2026-11-09
 
 - Do lto for wick binary itself

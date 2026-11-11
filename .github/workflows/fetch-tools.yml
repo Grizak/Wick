@@ -3,10 +3,6 @@ name: Fetch Tools
 on:
   workflow_dispatch:
 
-concurrency:
-  group: fetch-tools
-  cancel-in-progress: true
-
 env:
   SCCACHE_BUCKET: sccache
   SCCACHE_ENDPOINT: http://100.125.229.8:3900
@@ -91,7 +87,7 @@ jobs:
           curl --fail --location \
             --retry 10 \
             --retry-all-errors \
-            --retry-delay 2 \
+            --retry-delay 5 \
             --output musl-cross-make/sources/config.sub \
             "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=3d5db9ebe860"
 
@@ -100,7 +96,7 @@ jobs:
             sha1sum -c ../hashes/config.sub.3d5db9ebe860.sha1
           )
 
-      - name: Configure musl-cross-make for static builds
+      - name: Configure musl-cross-make for static builds (Linux)
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
@@ -214,13 +210,6 @@ jobs:
             --branch llvmorg-${{ steps.llvm-version.outputs.version }} \
             https://github.com/llvm/llvm-project.git
 
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-${{ matrix.platform }}-${{ steps.llvm-version.outputs.version }}-musl
-
       - name: Build LLVM libraries and lld (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -244,7 +233,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
-          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -267,7 +256,7 @@ jobs:
             -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
 
-          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Copy headers
         run: |
@@ -283,6 +272,12 @@ jobs:
             "$OUT/include/$PLATFORM/llvm-c/"
           cp -R llvm-project/lld/include/lld/. \
             "$OUT/include/$PLATFORM/lld/"
+
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$OUT/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$OUT/include/$PLATFORM/lld/$flavor/"
+          done
 
           # Include generated config headers, if present.
           if [ -d llvm-project/build/include/llvm ]; then
@@ -301,70 +296,16 @@ jobs:
             cp "$lib" "$OUT/"
           done
 
-          ls -l "$OUT"
-
-      - name: Prepare binaries
-        run: |
-          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          mkdir -p "$BIN"
-          cp llvm-project/build/bin/${{ matrix.lld_binary }} "$BIN/${{ matrix.lld_binary }}"
-          chmod +x "$BIN"/*
-
       - name: Verify outputs
         run: |
           set -euo pipefail
           OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
-          test -f src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
           test -n "$(ls "$OUT"/*.a 2>/dev/null)" || { echo "No archives copied"; exit 1; }
-
-      - name: Strip binaries (Linux)
-        if: runner.os == 'Linux'
-        run: strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
-
-      - name: Strip binaries (macOS)
-        if: runner.os == 'macOS'
-        run: strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
-
-      - name: Verify musl outputs (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-
-          BIN="src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}"
-          LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
-
-          echo "Checking lld..."
-          file "$BIN"
-          readelf -l "$BIN" | grep INTERP && {
-            echo "ERROR: lld has a dynamic interpreter"
-            exit 1
-          } || true
-
-          echo "Checking for glibc-specific symbol..."
-          if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
-            echo "ERROR: glibc-specific references remain"
-            exit 1
-          fi
-
-          echo "Checking dynamic dependencies..."
-          if readelf -d "$BIN" | grep NEEDED; then
-            echo "ERROR: lld has dynamic dependencies"
-            exit 1
-          fi
-
-          echo "Musl verification passed!"
-
-      - name: Write versions
-        run: |
-          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          LLD_VERSION=$($BIN/${{ matrix.lld_binary }} --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          echo "{\"lld\": \"$LLD_VERSION\"}" > $BIN/versions.json
 
       - uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
             src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
             src/internal/llvm/toolchain/include/${{ matrix.platform }}/
 
@@ -410,13 +351,6 @@ jobs:
         run: |
           git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
 
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-windows-amd64-clang-${{ env.LLVM_VERSION }}
-
       - name: Build LLVM libraries and lld
         run: |
           cmake -S llvm-project/llvm -B llvm-project/build \
@@ -427,10 +361,13 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_UTILS=OFF \
+            -DLLVM_INCLUDE_UTILS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLD_BUILD_TOOLS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
@@ -448,6 +385,11 @@ jobs:
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
           cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$root/include/$PLATFORM/lld/$flavor/"
+          done
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -479,12 +421,10 @@ jobs:
           echo "Copied $copied archives into $out"
           ls -la "$out"
 
-      - name: Prepare binaries
+      - name: Copy kernel32.lib
         run: |
-          out=src/internal/llvm/toolchain/bin/windows_amd64
+          out=src/internal/llvm/toolchain/libc/windows_amd64
           mkdir -p "$out"
-
-          cp llvm-project/build/bin/lld-link.exe "$out/"
 
           # Windows SDK version folders look like 10.0.26100.0
           sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
@@ -503,7 +443,6 @@ jobs:
         run: |
           set -euo pipefail
           out=src/internal/llvm/toolchain/lib/windows_amd64
-          test -f src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
           archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
           if [ -z "$archives" ]; then
             echo "No archives found in $out"
@@ -511,37 +450,12 @@ jobs:
             exit 1
           fi
 
-          set -euo pipefail
-          dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe; do
-            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
-              case "${dll,,}" in
-                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
-                *) echo "$dll" ;;
-              esac
-            done)
-            if [ -n "$bad" ]; then
-              echo "Non-system DLL dependencies in $exe:"
-              echo "$bad"
-              exit 1
-            fi
-          done
-
-      - name: Strip binaries
-        run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-
-      - name: Write versions
-        run: |
-          bin=src/internal/llvm/toolchain/bin/windows_amd64
-          lld=$("$bin/lld-link.exe" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
-          printf '{"lld":"%s"}\n' "$lld" > "$bin/versions.json"
-
       - uses: actions/upload-artifact@v6
         with:
           name: windows-amd64-tools
           if-no-files-found: error
           path: |
-            src/internal/llvm/toolchain/bin/windows_amd64/
+            src/internal/llvm/toolchain/libc/windows_amd64/
             src/internal/llvm/toolchain/lib/windows_amd64/
             src/internal/llvm/toolchain/include/windows_amd64/
 
@@ -587,13 +501,6 @@ jobs:
         run: |
           git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
 
-      - name: Cache LLVM build
-        id: cache-llvm-build
-        uses: actions/cache@v5
-        with:
-          path: llvm-project/build
-          key: llvm-build-windows-arm64-mingw-${{ env.LLVM_VERSION }}
-
       - name: Build LLVM libraries and lld
         run: |
           cmake -S llvm-project/llvm -B llvm-project/build \
@@ -608,10 +515,13 @@ jobs:
             -DLLVM_USE_CRT_RELEASE=MT \
             -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
             -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_UTILS=OFF \
+            -DLLVM_INCLUDE_UTILS=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLD_BUILD_TOOLS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
@@ -629,6 +539,11 @@ jobs:
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
           cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$root/include/$PLATFORM/lld/$flavor/"
+          done
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -660,12 +575,10 @@ jobs:
           echo "Copied $copied archives into $out"
           ls -la "$out"
 
-      - name: Prepare binaries
+      - name: Copy kernel32.lib
         run: |
-          out=src/internal/llvm/toolchain/bin/windows_arm64
+          out=src/internal/llvm/toolchain/libc/windows_arm64
           mkdir -p "$out"
-
-          cp llvm-project/build/bin/lld-link.exe "$out/"
 
           # Windows SDK version folders look like 10.0.26100.0
           sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
@@ -684,7 +597,6 @@ jobs:
         run: |
           set -euo pipefail
           out=src/internal/llvm/toolchain/lib/windows_arm64
-          test -f src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
           archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
           if [ -z "$archives" ]; then
             echo "No archives found in $out"
@@ -692,37 +604,12 @@ jobs:
             exit 1
           fi
 
-          set -euo pipefail
-          dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe; do
-            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
-              case "${dll,,}" in
-                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
-                *) echo "$dll" ;;
-              esac
-            done)
-            if [ -n "$bad" ]; then
-              echo "Non-system DLL dependencies in $exe:"
-              echo "$bad"
-              exit 1
-            fi
-          done
-
-      - name: Strip binaries
-        run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
-
-      - name: Write versions
-        run: |
-          bin=src/internal/llvm/toolchain/bin/windows_arm64
-          lld=$("$bin/lld-link.exe" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
-          printf '{"lld":"%s"}\n' "$lld" > "$bin/versions.json"
-
       - uses: actions/upload-artifact@v6
         with:
           name: windows-arm64-tools
           if-no-files-found: error
           path: |
-            src/internal/llvm/toolchain/bin/windows_arm64/
+            src/internal/llvm/toolchain/libc/windows_arm64/
             src/internal/llvm/toolchain/lib/windows_arm64/
             src/internal/llvm/toolchain/include/windows_arm64/
 

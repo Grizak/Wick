@@ -42,7 +42,7 @@ case "$platform" in
   darwin_*)
     # ld64 has no --start-group. Order matters, so if you see undefined
     # symbols, add -Wl,-all_load here.
-    echo "-L$dir ${libs[*]} -lc++ -lm"
+    echo "-L$dir ${libs[*]} -lc++ -lm -lxml2"
     ;;
   *)
     echo "unknown platform: $platform" >&2
