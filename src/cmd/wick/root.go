@@ -12,7 +12,7 @@ var rootCmd = &cobra.Command{
 	Short: "The Wick compiler",
 
 	// --version
-	Version: version,
+	Version: Version(),
 
 	// Make "wick build" and "wick" do the same thing (i.e. "build" is the default command)
 	// for backwards compatibility with older versions of the compiler and convenience
