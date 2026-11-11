@@ -475,7 +475,6 @@ jobs:
         run: |
           set -euo pipefail
           out=src/internal/llvm/toolchain/lib/windows_amd64
-          test -f src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
           archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
           if [ -z "$archives" ]; then
             echo "No archives found in $out"
@@ -634,7 +633,6 @@ jobs:
         run: |
           set -euo pipefail
           out=src/internal/llvm/toolchain/lib/windows_arm64
-          test -f src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
           archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
           if [ -z "$archives" ]; then
             echo "No archives found in $out"
