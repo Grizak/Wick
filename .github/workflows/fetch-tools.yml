@@ -303,44 +303,18 @@ jobs:
             cp "$lib" "$OUT/"
           done
 
-          ls -l "$OUT"
-
-      - name: Prepare binaries
-        run: |
-          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          mkdir -p "$BIN"
-          cp llvm-project/build/bin/${{ matrix.lld_binary }} "$BIN/${{ matrix.lld_binary }}"
-          chmod +x "$BIN"/*
-
       - name: Verify outputs
         run: |
           set -euo pipefail
           OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
-          test -f src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
           test -n "$(ls "$OUT"/*.a 2>/dev/null)" || { echo "No archives copied"; exit 1; }
-
-      - name: Strip binaries (Linux)
-        if: runner.os == 'Linux'
-        run: strip src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
-
-      - name: Strip binaries (macOS)
-        if: runner.os == 'macOS'
-        run: strip -x src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}
 
       - name: Verify musl outputs (Linux)
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
 
-          BIN="src/internal/llvm/toolchain/bin/${{ matrix.platform }}/${{ matrix.lld_binary }}"
           LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
-
-          echo "Checking lld..."
-          file "$BIN"
-          readelf -l "$BIN" | grep INTERP && {
-            echo "ERROR: lld has a dynamic interpreter"
-            exit 1
-          } || true
 
           echo "Checking for glibc-specific symbol..."
           if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
@@ -356,17 +330,10 @@ jobs:
 
           echo "Musl verification passed!"
 
-      - name: Write versions
-        run: |
-          BIN=src/internal/llvm/toolchain/bin/${{ matrix.platform }}
-          LLD_VERSION=$($BIN/${{ matrix.lld_binary }} --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-          echo "{\"lld\": \"$LLD_VERSION\"}" > $BIN/versions.json
-
       - uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
             src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
             src/internal/llvm/toolchain/include/${{ matrix.platform }}/
 
@@ -486,12 +453,10 @@ jobs:
           echo "Copied $copied archives into $out"
           ls -la "$out"
 
-      - name: Prepare binaries
+      - name: Copy kernel32.lib
         run: |
-          out=src/internal/llvm/toolchain/bin/windows_amd64
+          out=src/internal/llvm/toolchain/libc/windows_amd64
           mkdir -p "$out"
-
-          cp llvm-project/build/bin/lld-link.exe "$out/"
 
           # Windows SDK version folders look like 10.0.26100.0
           sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
@@ -517,31 +482,6 @@ jobs:
             ls -la "$out" || true
             exit 1
           fi
-
-          set -euo pipefail
-          dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe; do
-            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
-              case "${dll,,}" in
-                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
-                *) echo "$dll" ;;
-              esac
-            done)
-            if [ -n "$bad" ]; then
-              echo "Non-system DLL dependencies in $exe:"
-              echo "$bad"
-              exit 1
-            fi
-          done
-
-      - name: Strip binaries
-        run: strip src/internal/llvm/toolchain/bin/windows_amd64/lld-link.exe
-
-      - name: Write versions
-        run: |
-          bin=src/internal/llvm/toolchain/bin/windows_amd64
-          lld=$("$bin/lld-link.exe" --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
-          printf '{"lld":"%s"}\n' "$lld" > "$bin/versions.json"
 
       - uses: actions/upload-artifact@v6
         with:
@@ -672,12 +612,10 @@ jobs:
           echo "Copied $copied archives into $out"
           ls -la "$out"
 
-      - name: Prepare binaries
+      - name: Copy kernel32.lib
         run: |
-          out=src/internal/llvm/toolchain/bin/windows_arm64
+          out=src/internal/llvm/toolchain/libc/windows_arm64
           mkdir -p "$out"
-
-          cp llvm-project/build/bin/lld-link.exe "$out/"
 
           # Windows SDK version folders look like 10.0.26100.0
           sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
@@ -703,25 +641,6 @@ jobs:
             ls -la "$out" || true
             exit 1
           fi
-
-          set -euo pipefail
-          dump=objdump
-          for exe in src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe; do
-            bad=$($dump -p "$exe" | awk '/DLL Name:/{print $3}' | while read -r dll; do
-              case "${dll,,}" in
-                kernel32.dll|ntdll.dll|msvcrt.dll|advapi32.dll|ole32.dll|shell32.dll|user32.dll|bcrypt.dll|ws2_32.dll|api-ms-win-*.dll|ext-ms-win-*.dll) ;;
-                *) echo "$dll" ;;
-              esac
-            done)
-            if [ -n "$bad" ]; then
-              echo "Non-system DLL dependencies in $exe:"
-              echo "$bad"
-              exit 1
-            fi
-          done
-
-      - name: Strip binaries
-        run: strip src/internal/llvm/toolchain/bin/windows_arm64/lld-link.exe
 
       - name: Write versions
         run: |
