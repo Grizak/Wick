@@ -11,11 +11,6 @@ MUSL_CXX := $(MUSL_TOOLCHAIN)/bin/x86_64-linux-musl-g++
 
 # Lazily evaluated, so the script only runs for targets that need it
 LDFLAGS_HOST = $(shell $(ROOT)/scripts/llvm-ldflags.sh $(GOOS_HOST)_$(GOARCH_HOST))
-LDFLAGS_linux_amd64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh linux_amd64)
-LDFLAGS_linux_arm64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh linux_arm64)
-LDFLAGS_windows_amd64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh windows_amd64)
-LDFLAGS_windows_arm64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh windows_arm64)
-LDFLAGS_darwin_arm64 = $(shell $(ROOT)/scripts/llvm-ldflags.sh darwin_arm64)
 
 version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 
@@ -32,6 +27,8 @@ dev:
 	-ldflags "-X main.version=$(version) -linkmode=external -extldflags=-static" \
 	-o "$(DEV_OUT)" ./src/cmd/wick
 
+TEST_FLAGS ?= -v
+
 test:
 	CC=gcc \
 	CXX=g++ \
@@ -39,7 +36,8 @@ test:
 	CGO_CFLAGS="-I$(LLVM_INCLUDE) -ffunction-sections -fdata-sections -flto" \
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
-	go test -tags "byollvm llvm20" -v ./src/...
+	go test -tags "byollvm llvm20" \
+	 $(TEST_FLAGS) ./src/...
 
 release:
 	goreleaser release --clean
