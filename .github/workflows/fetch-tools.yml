@@ -3,10 +3,6 @@ name: Fetch Tools
 on:
   workflow_dispatch:
 
-concurrency:
-  group: fetch-tools
-  cancel-in-progress: true
-
 env:
   SCCACHE_BUCKET: sccache
   SCCACHE_ENDPOINT: http://100.125.229.8:3900
@@ -284,6 +280,12 @@ jobs:
           cp -R llvm-project/lld/include/lld/. \
             "$OUT/include/$PLATFORM/lld/"
 
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$OUT/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$OUT/include/$PLATFORM/lld/$flavor/"
+          done
+
           # Include generated config headers, if present.
           if [ -d llvm-project/build/include/llvm ]; then
             cp -R llvm-project/build/include/llvm/. \
@@ -448,6 +450,11 @@ jobs:
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
           cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$root/include/$PLATFORM/lld/$flavor/"
+          done
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
@@ -629,6 +636,11 @@ jobs:
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
           cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." \
+              "$root/include/$PLATFORM/lld/$flavor/"
+          done
           if [ -d llvm-project/build/include/llvm ]; then
             cp -r llvm-project/build/include/llvm/. "$root/llvm/"
           fi
