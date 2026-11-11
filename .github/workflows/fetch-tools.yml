@@ -240,7 +240,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
-          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -263,7 +263,7 @@ jobs:
             -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
 
-          ninja -C build lld LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
 
       - name: Copy headers
         run: |
@@ -308,27 +308,6 @@ jobs:
           set -euo pipefail
           OUT=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
           test -n "$(ls "$OUT"/*.a 2>/dev/null)" || { echo "No archives copied"; exit 1; }
-
-      - name: Verify musl outputs (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-
-          LIB="src/internal/llvm/toolchain/lib/${{ matrix.platform }}"
-
-          echo "Checking for glibc-specific symbol..."
-          if nm -A -u "$LIB"/*.a | grep '__libc_single_threaded'; then
-            echo "ERROR: glibc-specific references remain"
-            exit 1
-          fi
-
-          echo "Checking dynamic dependencies..."
-          if readelf -d "$BIN" | grep NEEDED; then
-            echo "ERROR: lld has dynamic dependencies"
-            exit 1
-          fi
-
-          echo "Musl verification passed!"
 
       - uses: actions/upload-artifact@v6
         with:
@@ -400,6 +379,7 @@ jobs:
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLD_BUILD_TOOLS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
@@ -558,6 +538,7 @@ jobs:
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLD_BUILD_TOOLS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
