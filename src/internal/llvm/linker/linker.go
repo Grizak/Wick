@@ -24,7 +24,6 @@ func Link(objFiles []string, outFile string, save bool, target string, ldflags [
 			return err
 		}
 
-		// Windows args - lld-link
 		args = append(args, "/OUT:"+outFile+".exe")
 		args = append(args, "/ENTRY:main")
 		args = append(args, "/SUBSYSTEM:CONSOLE")
@@ -32,6 +31,16 @@ func Link(objFiles []string, outFile string, save bool, target string, ldflags [
 		args = append(args, fmt.Sprintf("/LIBPATH:%s", cache))
 		args = append(args, kernel32)
 	} else {
+		if target == "x86_64-apple-darwin" || target == "aarch64-apple-darwin" {
+			var arch string
+			switch target {
+			case "x86_64-apple-darwin":
+				arch = "x86_64"
+			case "aarch64-apple-darwin":
+				arch = "arm64"
+			}
+			args = append(args, "-arch", arch, "-platform_version", "macos", "13.0", "13.0")
+		}
 		args = append(args, "-o", outFile)
 	}
 	args = append(args, ldflags...)

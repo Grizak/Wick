@@ -15,7 +15,7 @@ func (t Win_Amd64) SysExit() string {
 }
 
 func (t Win_Amd64) EntryPoint() string {
-	return "mainCRTStartup"
+	return "main"
 }
 
 func (t Win_Amd64) DataLayout() string {

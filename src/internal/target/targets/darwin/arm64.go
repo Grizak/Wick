@@ -15,7 +15,7 @@ func (t Darwin_Arm64) SysExit() string {
 }
 
 func (t Darwin_Arm64) EntryPoint() string {
-	return "_main"
+	return "main"
 }
 
 func (t Darwin_Arm64) DataLayout() string {
