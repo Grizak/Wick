@@ -15,7 +15,7 @@ func (t Win_Arm64) SysExit() string {
 }
 
 func (t Win_Arm64) EntryPoint() string {
-	return "mainCRTStartup"
+	return "main"
 }
 
 func (t Win_Arm64) DataLayout() string {
