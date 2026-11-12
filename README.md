@@ -2,8 +2,6 @@
 
 A compiled, statically typed programming language with a clean, Python-inspired syntax that compiles to native executables via LLVM IR.
 
-This project is actively maintained by me (Grizak) on my [youtube channel](https://youtube.com/@grizakbuilds), in this [playlist](https://youtube.com/playlist?list=PLRaVNasWvQcM&si=FHzRNCJZUOAJe5i4)
-
 ## Features
 
 - Clean, minimal syntax
@@ -21,6 +19,8 @@ This project is actively maintained by me (Grizak) on my [youtube channel](https
 ## Installation
 
 Download the latest release for your platform from the [releases page](https://github.com/Grizak/Wick/releases).
+
+You can also download it from my official apt/rpm/arch repository, more info [here](https://pkg.isaksweb.xyz).
 
 If you're on windows, it might say "missing dll dependency" or "The program cannot execute because [some filename] couldn't be found", in that case, you should install the [Microsoft Visual C++ Redistributable for Visual Studio](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) (latest version) and try again.
 
@@ -42,10 +42,14 @@ wick input.wi -o output -s
 | Host          | Supported |
 | ------------- | --------- |
 | Linux/amd64   | ✅        |
+| Linux/arm64   | ✅        |
 | macOS/arm64   | ✅        |
 | Windows/amd64 | ✅        |
+| Windows/arm64 | ✅        |
 
 ## Supported Targets
+
+This readme might now be up to date, run `wick version` to see full list of targets, they should be cross-compilable from all platforms
 
 | Target        | From Linux | From macOS | From Windows |
 | ------------- | ---------- | ---------- | ------------ |
@@ -53,8 +57,8 @@ wick input.wi -o output -s
 | linux/arm64   | ✅         | ✅         | ✅           |
 | darwin/amd64  | ✅         | ✅         | ✅           |
 | darwin/arm64  | ✅         | ✅         | ✅           |
-| windows/amd64 | ❌         | ❌         | ✅           |
-| windows/arm64 | ❌         | ❌         | ✅           |
+| windows/amd64 | ✅         | ✅         | ✅           |
+| windows/arm64 | ✅         | ✅         | ✅           |
 
 ## Syntax
 
@@ -159,7 +163,7 @@ The compiler binary will be at `dist/wick`.
 
 ## Roadmap
 
-- [ ] Built-in functions (`print`, etc.)
+- [ ] Libc + stdlib
 - [ ] More types (`bool`, `string`)
 - [ ] Arrays
 - [ ] Pointers
