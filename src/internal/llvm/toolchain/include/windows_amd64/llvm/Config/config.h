@@ -190,13 +190,13 @@
 #define HAVE__UNWIND_BACKTRACE 1
 
 /* Have host's __alloca */
-#define HAVE___ALLOCA 1
+/* #undef HAVE___ALLOCA */
 
 /* Have host's __ashldi3 */
-/* #undef HAVE___ASHLDI3 */
+#define HAVE___ASHLDI3 1
 
 /* Have host's __ashrdi3 */
-/* #undef HAVE___ASHRDI3 */
+#define HAVE___ASHRDI3 1
 
 /* Have host's __chkstk */
 /* #undef HAVE___CHKSTK */
@@ -205,37 +205,37 @@
 /* #undef HAVE___CHKSTK_MS */
 
 /* Have host's __cmpdi2 */
-/* #undef HAVE___CMPDI2 */
+#define HAVE___CMPDI2 1
 
 /* Have host's __divdi3 */
-/* #undef HAVE___DIVDI3 */
+#define HAVE___DIVDI3 1
 
 /* Have host's __fixdfdi */
-/* #undef HAVE___FIXDFDI */
+#define HAVE___FIXDFDI 1
 
 /* Have host's __fixsfdi */
-/* #undef HAVE___FIXSFDI */
+#define HAVE___FIXSFDI 1
 
 /* Have host's __floatdidf */
-/* #undef HAVE___FLOATDIDF */
+#define HAVE___FLOATDIDF 1
 
 /* Have host's __lshrdi3 */
-/* #undef HAVE___LSHRDI3 */
+#define HAVE___LSHRDI3 1
 
 /* Have host's __main */
 #define HAVE___MAIN 1
 
 /* Have host's __moddi3 */
-/* #undef HAVE___MODDI3 */
+#define HAVE___MODDI3 1
 
 /* Have host's __udivdi3 */
-/* #undef HAVE___UDIVDI3 */
+#define HAVE___UDIVDI3 1
 
 /* Have host's __umoddi3 */
-/* #undef HAVE___UMODDI3 */
+#define HAVE___UMODDI3 1
 
 /* Have host's ___chkstk */
-#define HAVE____CHKSTK 1
+/* #undef HAVE____CHKSTK */
 
 /* Have host's ___chkstk_ms */
 #define HAVE____CHKSTK_MS 1
@@ -293,6 +293,6 @@
 
 /* #undef HAVE_PROC_PID_RUSAGE */
 
-#define HAVE_BUILTIN_THREAD_POINTER 1
+/* #undef HAVE_BUILTIN_THREAD_POINTER */
 
 #endif

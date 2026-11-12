@@ -40,6 +40,7 @@ exit(result)
 	lex := lexer.NewLexer(source, "test.wk")
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
+
 	program, err := parser.NewParser("test.wk").Parse(tokens)
 	if err != nil {
 		t.Fatalf("parse test program: %v", err)

@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0
           lfs: false
       - name: Pull LFS objects from Forgejo
-        run: git lfs pull --include="src/internal/llvm/toolchain/bin/${{ matrix.platform }},src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
+        run: git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
       - name: Export LLVM link flags
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -94,21 +94,27 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_amd64/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/windows_amd64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean
       - uses: msys2/setup-msys2@v2
         id: msys2
         with:
-          msystem: MINGW64
+          msystem: CLANG64
           update: false
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-binutils
-      - name: Put MinGW on PATH
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-binutils
+            mingw-w64-clang-x86_64-lld
+      - name: Put Clang64 on PATH
         shell: pwsh
-        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\mingw64\bin"
+        run: |
+          $clangBin = "${{ steps.msys2.outputs.msys2-location }}\clang64\bin"
+          Add-Content $env:GITHUB_PATH $clangBin
+          Add-Content $env:GITHUB_ENV "CC=$clangBin\clang.exe"
+          Add-Content $env:GITHUB_ENV "CXX=$clangBin\clang++.exe"
+
       - name: Export LLVM link flags
         shell: bash
         run: |
@@ -162,7 +168,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/windows_arm64/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/windows_arm64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean
@@ -229,7 +235,7 @@ jobs:
           lfs: false
       - name: Pull LFS objects from Forgejo
         run: |
-          git lfs pull --include="src/internal/llvm/toolchain/bin/darwin_arm64/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
+          git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/darwin_arm64/*"
           # tell git to ignore musl changes (tracked files)
           git ls-files -z toolchains/musl/ | xargs -0 git update-index --skip-worktree --
           git status --porcelain # should be clean

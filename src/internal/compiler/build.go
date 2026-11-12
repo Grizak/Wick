@@ -1,11 +1,11 @@
 package compiler
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/Grizak/Wick/src/internal/lexer"
@@ -27,9 +27,14 @@ type BuildOptions struct {
 	SaveIntermediaries bool
 	Target             string
 	Opt                int
+	Ldflags            []string
 }
 
 func Build(opts BuildOptions) error {
+	if err := validateConfig(opts); err != nil {
+		return err
+	}
+
 	if err := prepareOutputDir(opts.Output); err != nil {
 		return err
 	}
@@ -54,17 +59,23 @@ func Build(opts BuildOptions) error {
 		return err
 	}
 
-	linker.Link(objects, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target])
+	linker.Link(objects, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target], opts.Ldflags)
 
 	return nil
 }
 
-func validateTarget(host, target string) error {
-	// Windows can only be targeted from Windows
-	if strings.HasPrefix(target, "windows/") &&
-		host != "windows" {
-		return fmt.Errorf("cross-compiling to Windows is not currently supported")
+func validateConfig(opts BuildOptions) error {
+	if opts.Opt > 3 || opts.Opt < 0 {
+		return fmt.Errorf("invalid optimization value %d: must be between 0 and 3", opts.Opt)
 	}
+	return nil
+}
+
+func validateTarget(host, targetName string) error {
+	if _, ok := target.TargetTriples[targetName]; !ok {
+		return fmt.Errorf("unsupported target %q", targetName)
+	}
+
 	return nil
 }
 
@@ -79,18 +90,20 @@ func prepareLLVM() error {
 
 func prepareOutputDir(output string) error {
 	outDir := filepath.Dir(output)
-	if _, err := os.Stat(outDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(outDir, 0755); err != nil {
-			return fmt.Errorf("Failed to create output directory %s: %v\n", outDir, err)
-		}
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return fmt.Errorf("create output directory %q: %w", outDir, err)
 	}
 	return nil
 }
 
 func validateInputs(inputs []string) error {
 	for _, input := range inputs {
-		if _, err := os.Stat(input); os.IsNotExist(err) {
-			return fmt.Errorf("Failed to read input file %s: %v\n", input, err)
+		info, err := os.Stat(input)
+		if err != nil {
+			return fmt.Errorf("stat input file %q: %w", input, err)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("input %q is not a regular file", input)
 		}
 	}
 	return nil
@@ -135,20 +148,19 @@ func compileInputs(opts BuildOptions) ([]string, error) {
 		close(results)
 	}()
 
-	errCounter := 0
-
 	// Collect results and handle errors
+	var errs = make([]error, len(opts.Input))
+
 	for r := range results {
 		if r.err != nil {
-			fmt.Fprintln(os.Stderr, r.err)
-			errCounter++
+			errs[r.index] = fmt.Errorf("%s: %w", opts.Input[r.index], r.err)
 		} else {
 			objects[r.index] = r.outputFile
 		}
 	}
 
-	if errCounter > 0 {
-		return nil, fmt.Errorf("%d error(s) occurred during compilation", errCounter)
+	if err := errors.Join(errs...); err != nil {
+		return nil, fmt.Errorf("compilation failed:\n%w", err)
 	}
 
 	return objects, nil
