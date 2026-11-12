@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.4.1] - 2026-11-12
+
+- Bugfixes for linker flags to make cross-linking work
+
 ## [v4.4.0] - 2026-11-11
 
 - Added **--ldflags**
