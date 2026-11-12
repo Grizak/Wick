@@ -49,7 +49,7 @@ wick input.wi -o output -s
 
 ## Supported Targets
 
-This readme might now be up to date, run `wick version` to see full list of targets, they should be cross-compilable from all platforms
+This readme might not be up to date, run `wick version` to see full list of targets, they should be cross-compilable from all platforms
 
 | Target        | From Linux | From macOS | From Windows |
 | ------------- | ---------- | ---------- | ------------ |
