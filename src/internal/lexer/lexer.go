@@ -63,6 +63,8 @@ func NewLexer(content, filename string) *Lexer {
 }
 
 func (t *Lexer) Tokenize(output chan types.LexerResult) {
+	defer close(output)
+
 	for {
 		r := t.peek(0)
 

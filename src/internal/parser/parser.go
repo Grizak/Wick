@@ -68,53 +68,77 @@ func (p *Parser) expect(tokenType types.TokenType) (types.Token, error) {
 	return token, nil
 }
 
-func (p *Parser) peek(offset int) types.Token {
-	// Fill buffer up to offset+1
-	for len(p.buffer) <= offset {
-		p.buffer = append(p.buffer, <-p.input)
+func (p *Parser) peek(offset int) (types.Token, error) {
+	if offset < 0 {
+		return types.Token{}, fmt.Errorf("negative lookahead offset: %d", offset)
 	}
-	return p.buffer[offset].Token
+
+	for len(p.buffer) <= offset {
+		result, ok := <-p.input
+		if !ok {
+			// The lexer should emit EOF before closing the channel.
+			return types.Token{}, fmt.Errorf("lexer input closed before EOF")
+		}
+		if result.Err != nil {
+			return types.Token{}, result.Err
+		}
+
+		p.buffer = append(p.buffer, result)
+
+		if result.Token.Type == types.TokenEOF {
+			// EOF is terminal; fill any remaining lookahead slots with EOF.
+			for len(p.buffer) <= offset {
+				p.buffer = append(p.buffer, result)
+			}
+			break
+		}
+	}
+
+	return p.buffer[offset].Token, nil
 }
 
 func (p *Parser) consume() (types.Token, error) {
-	// Make sure buffer has at least one token
 	if len(p.buffer) == 0 {
-		result := <-p.input
+		result, ok := <-p.input
+		if !ok {
+			return types.Token{}, fmt.Errorf("lexer input closed before EOF")
+		}
 		if result.Err != nil {
 			return types.Token{}, result.Err
 		}
 		return result.Token, nil
 	}
 
-	token := p.buffer[0]
-	if token.Err != nil {
-		return types.Token{}, token.Err
-	}
+	result := p.buffer[0]
 	p.buffer = p.buffer[1:]
-	return token.Token, nil
+
+	if result.Err != nil {
+		return types.Token{}, result.Err
+	}
+	return result.Token, nil
 }
 
 func (p *Parser) tryConsume(tokenType types.TokenType) (bool, error) {
 	if len(p.buffer) == 0 {
-		result := <-p.input
+		result, ok := <-p.input
+		if !ok {
+			return false, fmt.Errorf("lexer input closed before EOF")
+		}
 		if result.Err != nil {
 			return false, result.Err
 		}
-		if result.Token.Type == tokenType {
-			return true, nil
-		}
+		p.buffer = append(p.buffer, result)
+	}
+
+	result := p.buffer[0]
+	if result.Err != nil {
+		return false, result.Err
+	}
+
+	if result.Token.Type != tokenType {
 		return false, nil
 	}
 
-	token := p.buffer[0]
-	if token.Err != nil {
-		return false, token.Err
-	}
-
-	if token.Token.Type == tokenType {
-		p.buffer = p.buffer[1:]
-		return true, nil
-	}
-
-	return false, nil
+	p.buffer = p.buffer[1:]
+	return true, nil
 }

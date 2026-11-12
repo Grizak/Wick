@@ -22,17 +22,19 @@ This project is actively maintained by me (Grizak) on my [youtube channel](https
 
 Download the latest release for your platform from the [releases page](https://github.com/Grizak/Wick/releases).
 
+If you're on windows, it might say "missing dll dependency" or "The program cannot execute because [some filename] couldn't be found", in that case, you should install the [Microsoft Visual C++ Redistributable for Visual Studio](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) (latest version) and try again.
+
 ## Usage
 
 ```bash
 # Compile a file
-wickc input.wi -o output
+wick input.wi -o output
 
 # Cross-compile to a specific target
-wickc input.wi -o output -t linux/amd64
+wick input.wi -o output -t linux/amd64
 
 # Save intermediary files (.ll, .asm and .o)
-wickc input.wi -o output -s
+wick input.wi -o output -s
 ```
 
 ## Supported Hosts

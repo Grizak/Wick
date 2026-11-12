@@ -12,7 +12,9 @@ func (p *Parser) parseVarDecl(isConst bool) (*ast.NodeVarDecl, error) {
 	}
 
 	var typeName *string
-	if p.peek(0).Type == types.TokenColon {
+	if token, err := p.peek(0); err != nil {
+		return nil, err
+	} else if token.Type == types.TokenColon {
 		_, err := p.consume()
 		if err != nil {
 			return nil, err
