@@ -333,7 +333,7 @@ jobs:
           pattern: dist-packages-*
           merge-multiple: true
           path: dist/
-      - uses: Grizak/packages/.github/actions/publish@v2
+      - uses: Grizak/packages/.github/actions/publish@v3
         with:
           build-command: ":" # No-op
           build-dir: dist
