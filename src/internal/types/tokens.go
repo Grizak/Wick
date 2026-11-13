@@ -42,6 +42,8 @@ const (
 	TokenFunctionDecl TokenType = "fn"
 	TokenReturnStmt   TokenType = "return"
 	TokenImport       TokenType = "import"
+	TokenExtern       TokenType = "@extern"
+	TokenLibs         TokenType = "libs"
 )
 
 type Token struct {
@@ -51,7 +53,8 @@ type Token struct {
 }
 
 type Position struct {
-	Line   int
-	Column int
-	Index  int
+	Filename string
+	Line     int
+	Column   int
+	Index    int
 }

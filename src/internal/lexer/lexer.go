@@ -43,6 +43,8 @@ var keywords = map[string]types.TokenType{
 	"fn":       types.TokenFunctionDecl,
 	"return":   types.TokenReturnStmt,
 	"import":   types.TokenImport,
+	"@extern":  types.TokenExtern,
+	"libs":     types.TokenLibs,
 }
 
 type Lexer struct {
@@ -143,6 +145,27 @@ func (t *Lexer) lexString(output chan types.LexerResult) bool {
 			output <- types.LexerResult{Err: t.error("unterminated string literal", t.pos())}
 			return false
 		}
+		if r == '\\' {
+			t.consume() // consume \
+			esc := t.consume()
+			switch esc {
+			case 'n':
+				buf = append(buf, '\n')
+			case 't':
+				buf = append(buf, '\t')
+			case 'r':
+				buf = append(buf, '\r')
+			case '"':
+				buf = append(buf, '"')
+			case '\\':
+				buf = append(buf, '\\')
+			case '0':
+				buf = append(buf, 0)
+			default:
+				// error: unknown escape
+			}
+			continue
+		}
 		if r == '"' {
 			t.consume() // closing "
 			break
@@ -229,7 +252,7 @@ func (t *Lexer) consume() rune {
 }
 
 func (t *Lexer) pos() types.Position {
-	return types.Position{Line: t.line, Column: t.column, Index: t.index}
+	return types.Position{Line: t.line, Column: t.column, Index: t.index, Filename: t.file}
 }
 
 func (t *Lexer) error(msg string, pos types.Position) *types.CompileError {

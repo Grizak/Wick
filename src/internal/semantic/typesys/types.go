@@ -44,16 +44,14 @@ func (env *TypeEnvironment) Child() *TypeEnvironment {
 // TypeChecker validates type correctness
 type TypeChecker struct {
 	env       *TypeEnvironment
-	filename  string
 	loopDepth int // incremented when entering a loop, decremented when leaving
 	modules   map[string]map[string]types.Type
 }
 
-func NewTypeChecker(filename string) *TypeChecker {
+func NewTypeChecker() *TypeChecker {
 	return &TypeChecker{
-		filename: filename,
-		env:      NewTypeEnvironment(),
-		modules:  make(map[string]map[string]types.Type),
+		env:     NewTypeEnvironment(),
+		modules: make(map[string]map[string]types.Type),
 	}
 }
 
@@ -62,7 +60,6 @@ func (tc *TypeChecker) Environment() *TypeEnvironment {
 }
 
 func (tc *TypeChecker) CheckProgram(program *ast.NodeProgram) error {
-	tc.filename = program.Filename
 	for _, stmt := range program.Statements {
 		if err := tc.CheckStatement(&stmt); err != nil {
 			return err
@@ -218,7 +215,7 @@ func isBool(t types.Type) bool {
 
 func (tc *TypeChecker) error(msg string, pos *types.Position) *types.CompileError {
 	return &types.CompileError{
-		File: tc.filename,
+		File: pos.Filename,
 		Pos:  pos,
 		Msg:  msg,
 	}
