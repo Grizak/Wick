@@ -46,11 +46,10 @@ type Generator struct {
 	generatingModules map[string]bool
 }
 
-func NewGenerator(root *ast.NodeProgram, filename string) *Generator {
+func NewGenerator(root *ast.NodeProgram) *Generator {
 	return &Generator{
 		root:              root,
-		fileName:          filename,
-		typeChecker:       typesys.NewTypeChecker(filename),
+		typeChecker:       typesys.NewTypeChecker(),
 		scope:             NewScope(nil),
 		moduleFunctions:   make(map[string]map[string]Symbol),
 		generatedModules:  make(map[string]bool),
@@ -184,11 +183,10 @@ func (g *Generator) generateModule(program *ast.NodeProgram) error {
 		g.currentProgram = previousProgram
 	}()
 
-	g.fileName = program.Filename
 	g.currentProgram = program
 	g.scope = NewScope(nil)
 	g.globalScope = g.scope
-	g.typeChecker = typesys.NewTypeChecker(program.Filename)
+	g.typeChecker = typesys.NewTypeChecker()
 	g.typeChecker.Environment().Define("exit", &typesys.FunctionType{
 		ParamTypes: []types.Type{&typesys.Int64Type{}},
 		ReturnType: &typesys.VoidType{},
@@ -227,9 +225,9 @@ func (g *Generator) generateModule(program *ast.NodeProgram) error {
 }
 
 func programPath(program *ast.NodeProgram) string {
-	path, err := filepath.Abs(program.Filename)
+	path, err := filepath.Abs(program.Dir)
 	if err != nil {
-		return filepath.Clean(program.Filename)
+		return filepath.Clean(program.Dir)
 	}
 	return filepath.Clean(path)
 }
