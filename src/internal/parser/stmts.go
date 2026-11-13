@@ -151,6 +151,12 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				return nil, err
 			}
 			stmts = append(stmts, ast.NodeStatement{Import: importstmt})
+		case types.TokenExtern:
+			externStmt, err := p.parseExternStmt()
+			if err != nil {
+				return nil, err
+			}
+			stmts = append(stmts, ast.NodeStatement{Extern: externStmt})
 		default:
 			return nil, p.error("unexpected token", token)
 		}

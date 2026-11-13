@@ -32,7 +32,7 @@ func init() {
 
 	flags := rootCmd.PersistentFlags()
 
-	flags.StringP("output", "o", "dist/out", "Output file")
+	flags.StringP("output", "o", "build/out", "Output file")
 	flags.BoolP("save-intermediaries", "s", false, "Save intermediary files")
 	flags.StringP("target", "t", "", "Compilation target (default: same as host, can also be set via WICK_TARGET environment variable)")
 	flags.IntP("optimization", "O", 0, "Optimization level (0-3)")

@@ -7,7 +7,7 @@ import (
 	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 )
 
-func Link(objFiles []string, outFile string, save bool, target string, ldflags []string) error {
+func Link(obj, outFile string, save bool, target string, ldflags []string) error {
 	var args []string
 	if target == "x86_64-pc-windows-msvc" || target == "aarch64-pc-windows-msvc" {
 		var kernel32, machine string
@@ -44,21 +44,17 @@ func Link(objFiles []string, outFile string, save bool, target string, ldflags [
 		args = append(args, "-o", outFile)
 	}
 	args = append(args, ldflags...)
-	args = append(args, objFiles...)
+	args = append(args, obj)
 
 	err := internalLink(target, args)
 
 	if !save && err == nil {
-		for _, objFile := range objFiles {
-			if err := os.Remove(objFile); err != nil {
-				return err
-			}
+		if err := os.Remove(obj); err != nil {
+			return err
 		}
 	} else {
-		for counter, objFile := range objFiles {
-			if err := os.Rename(objFile, outFile+fmt.Sprint(counter)+".o"); err != nil {
-				return err
-			}
+		if err := os.Rename(obj, outFile+".o"); err != nil {
+			return err
 		}
 	}
 

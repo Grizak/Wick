@@ -24,7 +24,7 @@ func TestCheckProgramResolvesModulesAndQualifiedCalls(t *testing.T) {
 	program := parseTestProgram(t, rootPath, `import "math.wk"
 let result = math.add(1, 2)`)
 
-	if err := NewAnalyzer(rootPath).CheckProgram(&program); err != nil {
+	if err := NewAnalyzer().CheckProgram(&program); err != nil {
 		t.Fatalf("check program: %v", err)
 	}
 
@@ -35,9 +35,6 @@ let result = math.add(1, 2)`)
 	if importNode.ResolvedPath != modulePath {
 		t.Fatalf("resolved path = %q, want %q", importNode.ResolvedPath, modulePath)
 	}
-	if importNode.Program == nil || importNode.Program.Filename != modulePath {
-		t.Fatalf("module AST was not attached to the import")
-	}
 }
 
 func TestCheckProgramRejectsMissingModule(t *testing.T) {
@@ -45,7 +42,7 @@ func TestCheckProgramRejectsMissingModule(t *testing.T) {
 	rootPath := filepath.Join(dir, "main.wk")
 	program := parseTestProgram(t, rootPath, `import "missing.wk"`)
 
-	err := NewAnalyzer(rootPath).CheckProgram(&program)
+	err := NewAnalyzer().CheckProgram(&program)
 	if err == nil || !strings.Contains(err.Error(), "failed to read module") {
 		t.Fatalf("expected missing-module error, got %v", err)
 	}
@@ -62,7 +59,7 @@ func TestCheckProgramRejectsModuleCycles(t *testing.T) {
 	rootPath := filepath.Join(dir, "main.wk")
 	program := parseTestProgram(t, rootPath, `import "a.wk"`)
 
-	err := NewAnalyzer(rootPath).CheckProgram(&program)
+	err := NewAnalyzer().CheckProgram(&program)
 	if err == nil || !strings.Contains(err.Error(), "cyclic module import") {
 		t.Fatalf("expected cyclic-import error, got %v", err)
 	}
@@ -79,7 +76,7 @@ func TestCheckProgramRejectsUnknownModuleFunction(t *testing.T) {
 	program := parseTestProgram(t, rootPath, `import "math.wk"
 let result = math.subtract(1, 2)`)
 
-	err := NewAnalyzer(rootPath).CheckProgram(&program)
+	err := NewAnalyzer().CheckProgram(&program)
 	if err == nil || !strings.Contains(err.Error(), "undeclared function: math.subtract") {
 		t.Fatalf("expected unknown module function error, got %v", err)
 	}
@@ -92,7 +89,7 @@ func TestCheckProgramRejectsNestedImports(t *testing.T) {
 	import "math.wk"
 }`)
 
-	err := NewAnalyzer(rootPath).CheckProgram(&program)
+	err := NewAnalyzer().CheckProgram(&program)
 	if err == nil || !strings.Contains(err.Error(), "imports are only allowed at the top level") {
 		t.Fatalf("expected nested-import error, got %v", err)
 	}
@@ -103,7 +100,7 @@ func parseTestProgram(t *testing.T, filename, source string) ast.NodeProgram {
 	lex := lexer.NewLexer(source, filename)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
-	program, err := parser.NewParser(filename).Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens)
 	if err != nil {
 		t.Fatalf("parse program: %v", err)
 	}

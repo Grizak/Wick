@@ -15,7 +15,6 @@ import (
 )
 
 type Analyzer struct {
-	filepath       string
 	programs       []*ast.NodeProgram
 	programsByPath map[string]*ast.NodeProgram
 	visiting       map[string]bool
@@ -23,8 +22,8 @@ type Analyzer struct {
 	stack          []string
 }
 
-func NewAnalyzer(input string) *Analyzer {
-	return &Analyzer{filepath: input}
+func NewAnalyzer() *Analyzer {
+	return &Analyzer{}
 }
 
 func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
@@ -33,16 +32,12 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	a.visiting = make(map[string]bool)
 	a.loaded = make(map[string]bool)
 	a.stack = nil
-
-	if prog.Filename == "" {
-		prog.Filename = a.filepath
-	}
 	if err := a.validateTopLevelImports(prog); err != nil {
 		return err
 	}
-	rootPath, err := filepath.Abs(prog.Filename)
+	rootPath, err := filepath.Abs(prog.Dir)
 	if err != nil {
-		return fmt.Errorf("resolve source path %q: %w", prog.Filename, err)
+		return fmt.Errorf("resolve source path %q: %w", prog.Dir, err)
 	}
 	rootPath = filepath.Clean(rootPath)
 	a.programsByPath[rootPath] = prog
@@ -57,7 +52,7 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	a.programs = append(a.programs, prog)
 
 	for _, module := range a.programs {
-		tc := typesys.NewTypeChecker(module.Filename)
+		tc := typesys.NewTypeChecker()
 		if err := a.defineImportedModules(tc, module); err != nil {
 			return err
 		}
@@ -82,27 +77,27 @@ func (a *Analyzer) resolveImports(prog *ast.NodeProgram, currentPath string) err
 		}
 		resolvedPath, err := filepath.Abs(resolvedPath)
 		if err != nil {
-			return a.errorAt(prog.Filename, fmt.Sprintf("cannot resolve module path %q: %v", importNode.Module, err), importNode.Pos)
+			return a.errorAt(prog.Dir, fmt.Sprintf("cannot resolve module path %q: %v", importNode.Module, err), importNode.Pos)
 		}
 		resolvedPath = filepath.Clean(resolvedPath)
 
 		namespace := moduleNamespace(resolvedPath)
 		if !validIdentifier(namespace) {
-			return a.errorAt(prog.Filename, fmt.Sprintf("module filename %q does not produce a valid namespace", filepath.Base(resolvedPath)), importNode.Pos)
+			return a.errorAt(prog.Dir, fmt.Sprintf("module filename %q does not produce a valid namespace", filepath.Base(resolvedPath)), importNode.Pos)
 		}
 		if previousPath, exists := namespaces[namespace]; exists && previousPath != resolvedPath {
-			return a.errorAt(prog.Filename, fmt.Sprintf("multiple modules use namespace %q", namespace), importNode.Pos)
+			return a.errorAt(prog.Dir, fmt.Sprintf("multiple modules use namespace %q", namespace), importNode.Pos)
 		}
 		namespaces[namespace] = resolvedPath
 
 		if a.visiting[resolvedPath] {
 			cycle := append(append([]string(nil), a.stack...), resolvedPath)
-			return a.errorAt(prog.Filename, "cyclic module import: "+strings.Join(cycle, " -> "), importNode.Pos)
+			return a.errorAt(prog.Dir, "cyclic module import: "+strings.Join(cycle, " -> "), importNode.Pos)
 		}
 
 		module, exists := a.programsByPath[resolvedPath]
 		if !exists {
-			module, err = a.parseModule(resolvedPath, prog.Filename, importNode)
+			module, err = a.parseModule(resolvedPath, prog.Dir, importNode)
 			if err != nil {
 				return err
 			}
@@ -137,7 +132,7 @@ func (a *Analyzer) parseModule(path, importer string, importNode *ast.NodeImport
 	lex := lexer.NewLexer(string(content), path)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
-	module, err := parser.NewParser(path).Parse(tokens)
+	module, err := parser.NewParser().Parse(tokens, filepath.Dir(path))
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +150,7 @@ func (a *Analyzer) parseModule(path, importer string, importNode *ast.NodeImport
 }
 
 func (a *Analyzer) validateTopLevelImports(program *ast.NodeProgram) error {
-	return a.validateStatements(program.Statements, true, program.Filename)
+	return a.validateStatements(program.Statements, true, program.Dir)
 }
 
 func (a *Analyzer) validateStatements(statements []ast.NodeStatement, topLevel bool, filename string) error {
@@ -257,7 +252,7 @@ func (a *Analyzer) defineImportedModules(tc *typesys.TypeChecker, prog *ast.Node
 				return err
 			}
 			if _, exists := functions[decl.Name]; exists {
-				return a.errorAt(stmt.Import.Program.Filename, fmt.Sprintf("duplicate function declaration: %s", decl.Name), decl.Pos)
+				return a.errorAt(stmt.Import.Program.Dir, fmt.Sprintf("duplicate function declaration: %s", decl.Name), decl.Pos)
 			}
 			functions[decl.Name] = functionType
 		}

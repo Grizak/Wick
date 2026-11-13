@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/types"
@@ -10,17 +11,16 @@ import (
 type Parser struct {
 	input    chan types.LexerResult
 	buffer   []types.LexerResult
-	filename string
+	Libs     []string
+	libsSeen map[string]bool
 }
 
-func NewParser(filename string) *Parser {
-	return &Parser{
-		filename: filename,
-	}
+func NewParser() *Parser {
+	return &Parser{}
 }
 
 // Read from input, block when input is empty
-func (p *Parser) Parse(input chan types.LexerResult) (ast.NodeProgram, error) {
+func (p *Parser) Parse(input chan types.LexerResult, dir string) (ast.NodeProgram, error) {
 	p.input = input
 	var program ast.NodeProgram
 	stmts, err := p.parseStatements(types.TokenEOF)
@@ -28,7 +28,7 @@ func (p *Parser) Parse(input chan types.LexerResult) (ast.NodeProgram, error) {
 		return program, err
 	}
 	program.Statements = stmts
-	program.Filename = p.filename
+	program.Dir = dir
 	return program, nil
 }
 
@@ -51,7 +51,7 @@ func (p *Parser) parseExit() (*ast.NodeExit, error) {
 
 func (p *Parser) error(msg string, token types.Token) *types.CompileError {
 	return &types.CompileError{
-		File: p.filename,
+		File: token.Pos.Filename,
 		Pos:  &token.Pos,
 		Msg:  msg,
 	}
@@ -141,4 +141,16 @@ func (p *Parser) tryConsume(tokenType types.TokenType) (bool, error) {
 
 	p.buffer = p.buffer[1:]
 	return true, nil
+}
+
+func (p *Parser) AddLibs(libs string) {
+	libsSlice := strings.SplitSeq(libs, ",")
+	for lib := range libsSlice {
+		lib = strings.TrimSpace(lib)
+		if _, ok := p.libsSeen[lib]; ok {
+			continue
+		}
+		p.Libs = append(p.Libs, lib)
+		p.libsSeen[lib] = true
+	}
 }

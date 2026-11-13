@@ -13,9 +13,6 @@ import (
 func TestParsePreservesProgramAndExpressionStructure(t *testing.T) {
 	program := parse(t, "sample.wk", `let answer: i64 = 2 + 3 * 4
 exit(answer)`)
-	if program.Filename != "sample.wk" {
-		t.Fatalf("filename = %q, want sample.wk", program.Filename)
-	}
 	if len(program.Statements) != 2 {
 		t.Fatalf("got %d statements, want 2", len(program.Statements))
 	}
@@ -71,5 +68,5 @@ func parseWithError(t *testing.T, filename, source string) (ast.NodeProgram, err
 	t.Helper()
 	input := make(chan types.LexerResult, len([]rune(source))+1)
 	lexer.NewLexer(source, filename).Tokenize(input)
-	return parser.NewParser(filename).Parse(input)
+	return parser.NewParser().Parse(input)
 }
