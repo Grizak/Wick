@@ -12,7 +12,7 @@ MUSL_CXX := $(MUSL_TOOLCHAIN)/bin/x86_64-linux-musl-g++
 # Lazily evaluated, so the script only runs for targets that need it
 LDFLAGS_HOST = $(shell $(ROOT)/scripts/llvm-ldflags.sh $(GOOS_HOST)_$(GOARCH_HOST))
 
-version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+version := $(shell git tag --sort=-version:refname | head -1 2>/dev/null || echo "v0.0.0")
 
 dev:
 	mkdir -p $(dir $(DEV_OUT))
