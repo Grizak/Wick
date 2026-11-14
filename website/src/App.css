@@ -375,6 +375,43 @@
   border-top: 1px solid var(--line);
 }
 
+.updates-more {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+}
+
+.updates-more a,
+.changelog-page > a {
+  color: var(--lime);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.updates-more a:hover,
+.changelog-page > a:hover {
+  color: var(--ink);
+}
+
+.updates-more span {
+  margin-left: 5px;
+}
+
+.changelog-page > h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 40px;
+  font-weight: 520;
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+}
+
+.changelog-page > a {
+  display: inline-flex;
+  margin-top: 24px;
+}
+
 .changelog-entry {
   position: relative;
   display: grid;
