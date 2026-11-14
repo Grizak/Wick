@@ -21,6 +21,12 @@ Release metadata and assets are loaded from the GitHub Releases API at
 directly to each asset's `browser_download_url`; release pages link to the
 corresponding `html_url`.
 
+## Navigation
+
+The site uses React Router's `HashRouter`. The home page shows the three newest
+changelog entries; `/changelogs` displays the complete searchable release
+history.
+
 ## Development
 
 ```sh
