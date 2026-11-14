@@ -24,7 +24,6 @@ func Link(objFiles []string, outFile string, save bool, target string, ldflags [
 			return err
 		}
 
-		// Windows args - lld-link
 		args = append(args, "/OUT:"+outFile+".exe")
 		args = append(args, "/ENTRY:main")
 		args = append(args, "/SUBSYSTEM:CONSOLE")
