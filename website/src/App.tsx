@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import './App.css'
 
-const REGISTRY_URL = 'https://pkg.isaksweb.xyz'
+const GITHUB_RELEASES_URL =
+  'https://api.github.com/repos/Grizak/Wick/releases?per_page=100'
 
-type PackageFile = {
-  installcommand?: string
-  path?: string
-  size?: number
-  sha256?: string
+type ReleaseAsset = {
+  name: string
+  size: number
+  browser_download_url: string
 }
 
-type PackageVersion = {
-  name: string
+type WickRelease = {
   version: string
-  pkgs?: Record<string, PackageFile[]>
-  description?: string
+  htmlUrl: string
+  publishedAt?: string
+  prerelease: boolean
+  assets: ReleaseAsset[]
 }
 
 type ChangeEntry = {
@@ -37,10 +39,6 @@ type ChangeIndexItem =
       content?: string
       body?: string
     }
-
-type RegistryIndex = {
-  packages?: Array<{ name?: string; versions?: string[] }>
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -115,26 +113,6 @@ function versionFromTitle(title: string): string | undefined {
 
 function normalizeVersion(version: string): string {
   return version.replace(/^v/, '')
-}
-
-function compareVersions(left: string, right: string): number {
-  const leftParts = normalizeVersion(left).split(/[.+-]/)
-  const rightParts = normalizeVersion(right).split(/[.+-]/)
-  const length = Math.max(leftParts.length, rightParts.length)
-
-  for (let index = 0; index < length; index += 1) {
-    const leftPart = leftParts[index] ?? '0'
-    const rightPart = rightParts[index] ?? '0'
-    const leftNumber = Number(leftPart)
-    const rightNumber = Number(rightPart)
-    const comparison =
-      Number.isNaN(leftNumber) || Number.isNaN(rightNumber)
-        ? leftPart.localeCompare(rightPart)
-        : leftNumber - rightNumber
-    if (comparison !== 0) return comparison
-  }
-
-  return 0
 }
 
 function formatDate(value?: string): string | undefined {
@@ -244,142 +222,86 @@ async function loadChangelogs(): Promise<ChangeEntry[]> {
   throw new Error('No changelog entries were found.')
 }
 
-async function loadWickVersions(): Promise<PackageVersion[]> {
-  const index = (await fetchJson(`${REGISTRY_URL}/index.json`)) as RegistryIndex
-  const wick = index.packages?.find((item) => item.name === 'wick')
-  if (!wick?.versions?.length) throw new Error('Wick versions were not found.')
+async function loadWickReleases(): Promise<WickRelease[]> {
+  const value = await fetchJson(GITHUB_RELEASES_URL)
+  if (!Array.isArray(value)) {
+    throw new Error('GitHub returned an invalid releases list.')
+  }
+  if (value.length === 0) {
+    throw new Error('No Wick releases were found on GitHub.')
+  }
 
-  const versions = [...wick.versions].sort(compareVersions).reverse()
-  return Promise.all(
-    versions.map(async (version) => {
-      const record = (await fetchJson(
-        `${REGISTRY_URL}/packages/wick/${encodeURIComponent(version)}.json`,
-      )) as PackageVersion
-      if (!record.version || !record.pkgs) {
-        throw new Error(`The package record for Wick ${version} is incomplete.`)
+  return value.map((item): WickRelease => {
+    if (
+      !isRecord(item) ||
+      typeof item.tag_name !== 'string' ||
+      typeof item.html_url !== 'string' ||
+      typeof item.prerelease !== 'boolean' ||
+      !Array.isArray(item.assets)
+    ) {
+      throw new Error('GitHub returned an incomplete release.')
+    }
+
+    const assets = item.assets.map((asset): ReleaseAsset => {
+      if (
+        !isRecord(asset) ||
+        typeof asset.name !== 'string' ||
+        typeof asset.size !== 'number' ||
+        typeof asset.browser_download_url !== 'string'
+      ) {
+        throw new Error(`GitHub returned an invalid asset for ${item.tag_name}.`)
       }
-      return record
-    }),
-  )
-}
 
-function InlineMarkdown({ text }: { text: string }) {
-  const tokens = text.split(/(`[^`]+`)/g)
-  return (
-    <>
-      {tokens.map((token, index) =>
-        token.startsWith('`') && token.endsWith('`') ? (
-          <code key={`${index}-${token}`}>{token.slice(1, -1)}</code>
-        ) : (
-          <span key={`${index}-${token}`}>{token}</span>
-        ),
-      )}
-    </>
-  )
+      return {
+        name: asset.name,
+        size: asset.size,
+        browser_download_url: asset.browser_download_url,
+      }
+    })
+
+    return {
+      version: normalizeVersion(item.tag_name),
+      htmlUrl: item.html_url,
+      publishedAt:
+        typeof item.published_at === 'string' ? item.published_at : undefined,
+      prerelease: item.prerelease,
+      assets,
+    }
+  })
 }
 
 function MarkdownContent({ content }: { content: string }) {
-  const lines = content.replace(/\r\n/g, '\n').split('\n')
-  const blocks: Array<{ type: string; text: string[] }> = []
-  let inCode = false
-
-  for (const line of lines) {
-    if (line.trimStart().startsWith('```')) {
-      inCode = !inCode
-      continue
-    }
-    if (inCode) {
-      const last = blocks.at(-1)
-      if (last?.type === 'code') last.text.push(line)
-      else blocks.push({ type: 'code', text: [line] })
-      continue
-    }
-
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/)
-    const bullet = trimmed.match(/^[-*]\s+(.+)$/)
-    const type = heading ? `h${heading[1].length}` : bullet ? 'li' : 'p'
-    const text = heading?.[2] ?? bullet?.[1] ?? trimmed
-    const previous = blocks.at(-1)
-    if (type === 'li' && previous?.type === 'ul') previous.text.push(text)
-    else blocks.push({ type: type === 'li' ? 'ul' : type, text: [text] })
-  }
-
   return (
     <div className="markdown-content">
-      {blocks.map((block, index) => {
-        const key = `${block.type}-${index}`
-        if (block.type === 'ul') {
-          return (
-            <ul key={key}>
-              {block.text.map((line, lineIndex) => (
-                <li key={`${key}-${lineIndex}`}>
-                  <InlineMarkdown text={line} />
-                </li>
-              ))}
-            </ul>
-          )
-        }
-        if (block.type === 'code') {
-          return (
-            <pre key={key}>
-              <code>{block.text.join('\n')}</code>
-            </pre>
-          )
-        }
-        if (/^h[1-4]$/.test(block.type)) {
-          const Heading = block.type as 'h1' | 'h2' | 'h3' | 'h4'
-          return (
-            <Heading key={key}>
-              <InlineMarkdown text={block.text[0]} />
-            </Heading>
-          )
-        }
-        return (
-          <p key={key}>
-            <InlineMarkdown text={block.text[0]} />
-          </p>
-        )
-      })}
+      <ReactMarkdown>{content}</ReactMarkdown>
     </div>
   )
 }
 
-function PackageDownloads({ release }: { release: PackageVersion }) {
-  const groups = Object.entries(release.pkgs ?? {}).filter(
-    ([, files]) => files.length > 0,
-  )
-
-  if (groups.length === 0) {
+function ReleaseDownloads({ release }: { release: WickRelease }) {
+  if (release.assets.length === 0) {
     return <p className="empty-note">No downloadable builds listed for this version.</p>
   }
 
   return (
     <>
-      <a href={`https://github.com/Grizak/Wick/releases/tag/v${release.version}`} className="github-link" rel="noreferrer" target='_blank'>Open on github releases</a>
       <div className="download-grid">
-        {groups.map(([platform, files]) =>
-          files.map((file, index) => (
-            <a
-              className="download-link"
-              href={file.path ? `${REGISTRY_URL}/${file.path.replace(/^\/+/, '')}` : undefined}
-              key={`${platform}-${file.path ?? index}`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <span className="download-icon" aria-hidden="true">↓</span>
-              <span className="download-copy">
-                <strong>{platform}</strong>
-                <small>{file.path?.split('/').at(-1) ?? 'Package download'}</small>
-                {file.installcommand && (
-                  <code className="download-command">{file.installcommand}</code>
-                )}
-              </span>
-              <span className="download-size">{formatSize(file.size)}</span>
-            </a>
-          )),
-        )}
+        {release.assets.map((asset) => (
+          <a
+            className="download-link"
+            href={asset.browser_download_url}
+            key={asset.name}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <span className="download-icon" aria-hidden="true">↓</span>
+            <span className="download-copy">
+              <strong>{asset.name}</strong>
+              <small>GitHub release asset</small>
+            </span>
+            <span className="download-size">{formatSize(asset.size)}</span>
+          </a>
+        ))}
       </div>
     </>
   )
@@ -388,11 +310,11 @@ function PackageDownloads({ release }: { release: PackageVersion }) {
 function App() {
   const searchInput = useRef<HTMLInputElement>(null)
   const [changelogs, setChangelogs] = useState<ChangeEntry[]>([])
-  const [versions, setVersions] = useState<PackageVersion[]>([])
+  const [releases, setReleases] = useState<WickRelease[]>([])
   const [changelogError, setChangelogError] = useState('')
-  const [registryError, setRegistryError] = useState('')
+  const [releaseError, setReleaseError] = useState('')
   const [loadingChangelogs, setLoadingChangelogs] = useState(true)
-  const [loadingRegistry, setLoadingRegistry] = useState(true)
+  const [loadingReleases, setLoadingReleases] = useState(true)
   const [selectedVersion, setSelectedVersion] = useState('')
   const [search, setSearch] = useState('')
 
@@ -413,22 +335,26 @@ function App() {
         if (active) setLoadingChangelogs(false)
       })
 
-    loadWickVersions()
-      .then((releases) => {
+    loadWickReleases()
+      .then((loadedReleases) => {
         if (active) {
-          setVersions(releases)
-          setSelectedVersion(releases[0]?.version ?? '')
+          setReleases(loadedReleases)
+          setSelectedVersion(
+            loadedReleases.find((release) => !release.prerelease)?.version ??
+              loadedReleases[0]?.version ??
+              '',
+          )
         }
       })
       .catch((error: unknown) => {
         if (active) {
-          setRegistryError(
+          setReleaseError(
             error instanceof Error ? error.message : 'Unable to load releases.',
           )
         }
       })
       .finally(() => {
-        if (active) setLoadingRegistry(false)
+        if (active) setLoadingReleases(false)
       })
 
     return () => {
@@ -466,9 +392,10 @@ function App() {
     )
   }, [changelogs, search])
 
-  const selectedRelease = versions.find(
+  const selectedRelease = releases.find(
     (release) => release.version === selectedVersion,
   )
+  const latestStableRelease = releases.find((release) => !release.prerelease)
 
   return (
     <div className="site-shell">
@@ -588,14 +515,14 @@ function App() {
                 <p className="section-kicker">AVAILABLE BUILDS</p>
                 <h3>Downloads</h3>
               </div>
-              <span className="registry-status"><span className="live-dot" /> LIVE REGISTRY</span>
+              <span className="registry-status"><span className="live-dot" /> LIVE ON GITHUB</span>
             </div>
-            {loadingRegistry ? (
-              <div className="status-card"><span className="spinner" /> Checking the package registry…</div>
-            ) : registryError ? (
+            {loadingReleases ? (
+              <div className="status-card"><span className="spinner" /> Checking GitHub Releases…</div>
+            ) : releaseError ? (
               <div className="status-card error-card">
                 <span className="status-symbol">!</span>
-                <span><strong>Couldn’t load releases</strong><small>{registryError}</small></span>
+                <span><strong>Couldn’t load releases</strong><small>{releaseError}</small></span>
               </div>
             ) : (
               <>
@@ -606,9 +533,14 @@ function App() {
                     onChange={(event) => setSelectedVersion(event.target.value)}
                     value={selectedVersion}
                   >
-                    {versions.map((release, index) => (
+                    {releases.map((release) => (
                       <option key={release.version} value={release.version}>
-                        {release.version}{index === 0 ? ' — Latest' : ''}
+                        {release.version}
+                        {release === latestStableRelease
+                          ? ' — Latest'
+                          : release.prerelease
+                            ? ' — Pre-release'
+                            : ''}
                       </option>
                     ))}
                   </select>
@@ -618,10 +550,20 @@ function App() {
                   <div className="selected-release">
                     <div className="selected-release-title">
                       <span className="release-version">v{selectedRelease.version}</span>
-                      <span className="latest-tag">{selectedRelease === versions[0] ? 'LATEST' : 'RELEASE'}</span>
+                      <span className="latest-tag">
+                        {selectedRelease === latestStableRelease
+                          ? 'LATEST'
+                          : selectedRelease.prerelease
+                            ? 'PRE-RELEASE'
+                            : 'RELEASE'}
+                      </span>
                     </div>
-                    <p>{selectedRelease.description ?? 'Wick compiler release'}</p>
-                    <PackageDownloads release={selectedRelease} />
+                    <p>
+                      {formatDate(selectedRelease.publishedAt)
+                        ? `Published ${formatDate(selectedRelease.publishedAt)}`
+                        : 'Wick compiler release'}
+                    </p>
+                    <ReleaseDownloads release={selectedRelease} />
                   </div>
                 )}
               </>
