@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import './App.css'
 
 const GITHUB_RELEASES_URL =
@@ -269,85 +270,10 @@ async function loadWickReleases(): Promise<WickRelease[]> {
   })
 }
 
-function InlineMarkdown({ text }: { text: string }) {
-  const tokens = text.split(/(`[^`]+`)/g)
-  return (
-    <>
-      {tokens.map((token, index) =>
-        token.startsWith('`') && token.endsWith('`') ? (
-          <code key={`${index}-${token}`}>{token.slice(1, -1)}</code>
-        ) : (
-          <span key={`${index}-${token}`}>{token}</span>
-        ),
-      )}
-    </>
-  )
-}
-
 function MarkdownContent({ content }: { content: string }) {
-  const lines = content.replace(/\r\n/g, '\n').split('\n')
-  const blocks: Array<{ type: string; text: string[] }> = []
-  let inCode = false
-
-  for (const line of lines) {
-    if (line.trimStart().startsWith('```')) {
-      inCode = !inCode
-      continue
-    }
-    if (inCode) {
-      const last = blocks.at(-1)
-      if (last?.type === 'code') last.text.push(line)
-      else blocks.push({ type: 'code', text: [line] })
-      continue
-    }
-
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/)
-    const bullet = trimmed.match(/^[-*]\s+(.+)$/)
-    const type = heading ? `h${heading[1].length}` : bullet ? 'li' : 'p'
-    const text = heading?.[2] ?? bullet?.[1] ?? trimmed
-    const previous = blocks.at(-1)
-    if (type === 'li' && previous?.type === 'ul') previous.text.push(text)
-    else blocks.push({ type: type === 'li' ? 'ul' : type, text: [text] })
-  }
-
   return (
     <div className="markdown-content">
-      {blocks.map((block, index) => {
-        const key = `${block.type}-${index}`
-        if (block.type === 'ul') {
-          return (
-            <ul key={key}>
-              {block.text.map((line, lineIndex) => (
-                <li key={`${key}-${lineIndex}`}>
-                  <InlineMarkdown text={line} />
-                </li>
-              ))}
-            </ul>
-          )
-        }
-        if (block.type === 'code') {
-          return (
-            <pre key={key}>
-              <code>{block.text.join('\n')}</code>
-            </pre>
-          )
-        }
-        if (/^h[1-4]$/.test(block.type)) {
-          const Heading = block.type as 'h1' | 'h2' | 'h3' | 'h4'
-          return (
-            <Heading key={key}>
-              <InlineMarkdown text={block.text[0]} />
-            </Heading>
-          )
-        }
-        return (
-          <p key={key}>
-            <InlineMarkdown text={block.text[0]} />
-          </p>
-        )
-      })}
+      <ReactMarkdown>{content}</ReactMarkdown>
     </div>
   )
 }
