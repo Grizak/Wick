@@ -9,6 +9,6 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] })
   ],
   server: {
-    allowedHosts: ["localhost:5173", "vite.isaksweb.xyz"]
+    allowedHosts: ["localhost", "vite.isaksweb.xyz", "ubuntu"]
   }
 })
