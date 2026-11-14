@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 
 const GITHUB_RELEASES_URL =
@@ -97,6 +98,17 @@ function titleFromMarkdown(content: string): string {
   return heading?.[1]?.trim() ?? 'Release notes'
 }
 
+function sortChangelogs(entries: ChangeEntry[]): ChangeEntry[] {
+  return entries.sort((left, right) => {
+    if (left.date && right.date) {
+      return Date.parse(right.date) - Date.parse(left.date)
+    }
+    return (right.version ?? '').localeCompare(left.version ?? '', undefined, {
+      numeric: true,
+    })
+  })
+}
+
 function withoutTitleHeading(content: string, title: string): string {
   const lines = content.replace(/\r\n/g, '\n').split('\n')
   const headingIndex = lines.findIndex((line) => /^\s*#\s+/.test(line))
@@ -186,7 +198,7 @@ async function loadChangelogs(): Promise<ChangeEntry[]> {
           const directItems = getIndexItems(JSON.parse(text) as unknown)
           if (directItems.length > 0) {
             const entries = await Promise.all(directItems.map(fetchChangelogFile))
-            if (entries.length > 0) return entries
+            if (entries.length > 0) return sortChangelogs(entries)
           }
         } catch {
           directEntry = undefined
@@ -206,14 +218,7 @@ async function loadChangelogs(): Promise<ChangeEntry[]> {
     const items = getIndexItems(indexResult.value)
     if (items.length > 0) {
       const entries = await Promise.all(items.map(fetchChangelogFile))
-      return entries.sort((left, right) => {
-        if (left.date && right.date) {
-          return Date.parse(right.date) - Date.parse(left.date)
-        }
-        return (right.version ?? '').localeCompare(left.version ?? '', undefined, {
-          numeric: true,
-        })
-      })
+      return sortChangelogs(entries)
     }
   }
 
@@ -276,6 +281,68 @@ function MarkdownContent({ content }: { content: string }) {
       <ReactMarkdown>{content}</ReactMarkdown>
     </div>
   )
+}
+
+function ChangelogResults({
+  loading,
+  error,
+  changelogs,
+  entries,
+}: {
+  loading: boolean
+  error: string
+  changelogs: ChangeEntry[]
+  entries: ChangeEntry[]
+}) {
+  if (loading) {
+    return <div className="status-card"><span className="spinner" /> Loading the latest notes…</div>
+  }
+  if (error && changelogs.length === 0) {
+    return (
+      <div className="status-card error-card">
+        <span className="status-symbol">!</span>
+        <span><strong>Changelog unavailable</strong><small>{error}</small></span>
+      </div>
+    )
+  }
+  if (entries.length === 0) {
+    return (
+      <div className="status-card">
+        {changelogs.length ? 'No updates match that search.' : 'No changelog entries have been published yet.'}
+      </div>
+    )
+  }
+
+  return (
+    <div className="changelog-list">
+      {entries.map((entry, index) => (
+        <article className="changelog-entry" key={`${entry.id}-${index}`}>
+          <div className="entry-marker"><span /></div>
+          <div className="entry-main">
+            <div className="entry-meta">
+              {entry.version && <span className="version-pill">v{normalizeVersion(entry.version)}</span>}
+              {formatDate(entry.date) && <time>{formatDate(entry.date)}</time>}
+              {!entry.date && <span className="entry-label">{index === 0 ? 'LATEST NOTES' : 'RELEASE NOTES'}</span>}
+            </div>
+            <h3>{entry.title}</h3>
+            <MarkdownContent content={entry.content} />
+          </div>
+          <span className="entry-index">{String(index + 1).padStart(2, '0')}</span>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function ScrollToHash() {
+  const { hash, pathname } = useLocation()
+
+  useEffect(() => {
+    if (!hash) return
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView()
+  }, [hash, pathname])
+
+  return null
 }
 
 function ReleaseDownloads({ release }: { release: WickRelease }) {
@@ -396,25 +463,35 @@ function App() {
     (release) => release.version === selectedVersion,
   )
   const latestStableRelease = releases.find((release) => !release.prerelease)
+  const latestChangelogs = changelogs.slice(0, 3)
 
   return (
     <div className="site-shell">
       <header className="topbar">
-        <a className="brand" href="#" aria-label="Wick home">
+        <Link className="brand" to="/" aria-label="Wick home">
           <span className="brand-mark" aria-hidden="true">w</span>
           <span>wick<span className="brand-period">.</span></span>
-        </a>
+        </Link>
         <nav className="nav-links" aria-label="Main navigation">
           <a href="https://github.com/Grizak/Wick" rel="noreferrer" target="_blank">
             GitHub <span aria-hidden="true">↗</span>
           </a>
-          <a className="nav-cta" href="#downloads">
+          <Link to="/changelogs">
+            Changelog
+          </Link>
+          <Link className="nav-cta" to="/#downloads">
             Get Wick <span aria-hidden="true">↗</span>
-          </a>
+          </Link>
         </nav>
       </header>
 
       <main>
+        <ScrollToHash />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
         <section className="hero">
           <div className="hero-copy">
             <div className="eyebrow"><span className="live-dot" /> THE WICK CHANGELOG</div>
@@ -423,7 +500,7 @@ function App() {
               A running log of what’s new in Wick — the language that gets out
               of your way and lets you build.
             </p>
-            <a className="hero-link" href="#updates">Explore the updates <span aria-hidden="true">↓</span></a>
+            <Link className="hero-link" to="/#updates">Explore the updates <span aria-hidden="true">↓</span></Link>
           </div>
           <div className="hero-art" aria-hidden="true">
             <div className="orbit orbit-one" />
@@ -445,48 +522,17 @@ function App() {
               <p className="section-kicker">FROM THE WORKBENCH</p>
               <h2>Latest updates<span className="lime-period">.</span></h2>
             </div>
-            <label className="search-box">
-              <span className="search-icon" aria-hidden="true">⌕</span>
-              <input
-                aria-label="Search changelogs"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search updates"
-                ref={searchInput}
-                type="search"
-                value={search}
-              />
-              <kbd>/</kbd>
-            </label>
           </div>
 
-          {loadingChangelogs ? (
-            <div className="status-card"><span className="spinner" /> Loading the latest notes…</div>
-          ) : changelogError && changelogs.length === 0 ? (
-            <div className="status-card error-card">
-              <span className="status-symbol">!</span>
-              <span><strong>Changelog unavailable</strong><small>{changelogError}</small></span>
-            </div>
-          ) : filteredChangelogs.length === 0 ? (
-            <div className="status-card">
-              {changelogs.length ? 'No updates match that search.' : 'No changelog entries have been published yet.'}
-            </div>
-          ) : (
-            <div className="changelog-list">
-              {filteredChangelogs.map((entry, index) => (
-                <article className="changelog-entry" key={`${entry.id}-${index}`}>
-                  <div className="entry-marker"><span /></div>
-                  <div className="entry-main">
-                    <div className="entry-meta">
-                      {entry.version && <span className="version-pill">v{normalizeVersion(entry.version)}</span>}
-                      {formatDate(entry.date) && <time>{formatDate(entry.date)}</time>}
-                      {!entry.date && <span className="entry-label">{index === 0 ? 'LATEST NOTES' : 'RELEASE NOTES'}</span>}
-                    </div>
-                    <h3>{entry.title}</h3>
-                    <MarkdownContent content={entry.content} />
-                  </div>
-                  <span className="entry-index">{String(index + 1).padStart(2, '0')}</span>
-                </article>
-              ))}
+          <ChangelogResults
+            changelogs={changelogs}
+            entries={latestChangelogs}
+            error={changelogError}
+            loading={loadingChangelogs}
+          />
+          {!loadingChangelogs && changelogs.length > 3 && (
+            <div className="updates-more">
+              <Link to="/changelogs">View all {changelogs.length} changelogs <span aria-hidden="true">→</span></Link>
             </div>
           )}
         </section>
@@ -574,12 +620,57 @@ function App() {
             </div>
           </div>
         </section>
+              </>
+            }
+          />
+          <Route
+            path="/changelogs"
+            element={
+              <section className="updates-section changelog-page">
+                <div className="section-heading">
+                  <div>
+                    <p className="section-kicker">THE WICK CHANGELOG</p>
+                    <h2>All updates<span className="lime-period">.</span></h2>
+                  </div>
+                  <label className="search-box">
+                    <span className="search-icon" aria-hidden="true">⌕</span>
+                    <input
+                      aria-label="Search changelogs"
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search updates"
+                      ref={searchInput}
+                      type="search"
+                      value={search}
+                    />
+                    <kbd>/</kbd>
+                  </label>
+                </div>
+                <ChangelogResults
+                  changelogs={changelogs}
+                  entries={filteredChangelogs}
+                  error={changelogError}
+                  loading={loadingChangelogs}
+                />
+              </section>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <section className="updates-section changelog-page">
+                <p className="section-kicker">PAGE NOT FOUND</p>
+                <h2>That page isn’t here<span className="lime-period">.</span></h2>
+                <Link to="/">Back to Wick home</Link>
+              </section>
+            }
+          />
+        </Routes>
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#" aria-label="Wick home">
+        <Link className="brand footer-brand" to="/" aria-label="Wick home">
           <span className="brand-mark" aria-hidden="true">w</span><span>wick<span className="brand-period">.</span></span>
-        </a>
+        </Link>
         <span>AN OPEN LANGUAGE FOR OPEN MINDS.</span>
         <a href="https://github.com/Grizak/Wick" rel="noreferrer" target="_blank">MADE IN THE OPEN <span aria-hidden="true">↗</span></a>
       </footer>
