@@ -5,12 +5,16 @@
   --lime: #c2f36b;
   --line: rgba(235, 244, 232, 0.12);
   --panel: #151a16;
-  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   min-height: 100vh;
   overflow: hidden;
   color: var(--ink);
   background:
-    radial-gradient(ellipse at 79% 4%, rgba(116, 163, 73, 0.1), transparent 30rem),
+    radial-gradient(
+      ellipse at 79% 4%,
+      rgba(116, 163, 73, 0.1),
+      transparent 30rem
+    ),
     #101410;
 }
 
@@ -204,7 +208,7 @@
 
 .orbit-one::before,
 .orbit-two::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 8px;
   height: 8px;
@@ -387,7 +391,7 @@
 }
 
 .entry-marker::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 5px;
   bottom: -37px;
@@ -562,7 +566,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .release-section {
@@ -608,7 +614,11 @@
   padding: 23px;
   border: 1px solid rgba(235, 244, 232, 0.14);
   border-radius: 5px;
-  background: linear-gradient(145deg, rgba(28, 35, 28, 0.94), rgba(19, 24, 20, 0.94));
+  background: linear-gradient(
+    145deg,
+    rgba(28, 35, 28, 0.94),
+    rgba(19, 24, 20, 0.94)
+  );
 }
 
 .release-panel-header {
@@ -730,29 +740,12 @@
   border-radius: 3px;
   color: var(--ink);
   text-decoration: none;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .download-link:hover {
-  border-color: rgba(194, 243, 107, 0.42);
-  background: rgba(194, 243, 107, 0.035);
-}
-
-.github-link {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-width: 0;
-  padding: 11px 10px;
-  margin-bottom: 10px
-  border: 1px solid rgba(235, 244, 232, 0.1);
-  border-radius: 3px;
-  color: var(--ink);
-  text-decoration: none;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.github-link:hover {
   border-color: rgba(194, 243, 107, 0.42);
   background: rgba(194, 243, 107, 0.035);
 }
@@ -1034,8 +1027,7 @@
     font-size: 7px;
   }
 
-  .download-link, 
-  .github-link {
+  .download-link {
     gap: 8px;
     padding: 9px 7px;
   }

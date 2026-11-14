@@ -359,14 +359,6 @@ function ReleaseDownloads({ release }: { release: WickRelease }) {
 
   return (
     <>
-      <a
-        className="github-link"
-        href={release.htmlUrl}
-        rel="noreferrer"
-        target="_blank"
-      >
-        Open on GitHub Releases
-      </a>
       <div className="download-grid">
         {release.assets.map((asset) => (
           <a
