@@ -16,11 +16,16 @@ objects with `path` (or `file`/`name`), `title`, `version`, `date`, and
 `content`/`body` fields. If an entry includes its content, no separate file
 request is made.
 
-Release metadata is loaded from
-`https://pkg.isaksweb.xyz/index.json`. The `wick` package's versions are read
-from that index, then each version record is loaded from
-`https://pkg.isaksweb.xyz/packages/wick/<version>.json`. Artifact `path` values
-in those records are resolved against the registry host.
+Release metadata and assets are loaded from the GitHub Releases API at
+`https://api.github.com/repos/Grizak/Wick/releases?per_page=100`. Downloads link
+directly to each asset's `browser_download_url`; release pages link to the
+corresponding `html_url`.
+
+## Navigation
+
+The site uses React Router's `HashRouter`. The home page shows the three newest
+changelog entries; `/changelogs` displays the complete searchable release
+history.
 
 ## Development
 
