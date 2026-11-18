@@ -375,6 +375,8 @@ jobs:
               mingw-w64-clang-x86_64-binutils
               mingw-w64-clang-x86_64-python
               mingw-w64-clang-x86_64-sccache
+              mingw-w64-clang-x86_64-crt-git
+              mingw-w64-clang-x86_64-headers-git
           - os: windows-11-arm
             platform: windows_arm64
             msystem: CLANGARM64
@@ -390,6 +392,8 @@ jobs:
               mingw-w64-clang-aarch64-binutils
               mingw-w64-clang-aarch64-python
               mingw-w64-clang-aarch64-sccache
+              mingw-w64-clang-aarch64-crt-git
+              mingw-w64-clang-aarch64-headers-git
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -516,8 +520,15 @@ jobs:
           cp "$MINGW_LIB/libmingw32.a" "$out/" || true
           cp "$MINGW_LIB/libmingwex.a" "$out/" || true
           cp "$MINGW_LIB/libmsvcrt.a" "$out/" || true
-          cp "$MINGW_LIB/libgcc.a" "$out/" || true
-          cp "$MINGW_LIB/libucrt.a" "$out/" || true
+          for f in libucrt.a libgcc.a; do
+            src="$(find /clang64 -name "$f" -print -quit 2>/dev/null || true)"
+            if [ -n "$src" ]; then
+              cp "$src" "$out/"
+            else
+              echo "warning: $f not found under /clang64" >&2
+            fi
+          done
+
           ls -lh "$out/"
 
       - name: Verify outputs
