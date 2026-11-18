@@ -509,28 +509,34 @@ jobs:
       - name: Copy mingw CRT
         run: |
           set -euo pipefail
-          out=src/internal/llvm/toolchain/libc/windows_amd64
+
+          case "$MSYSTEM" in
+            CLANG64)    PREFIX=/clang64 ;;
+            CLANGARM64) PREFIX=/clangarm64 ;;
+            *) echo "unsupported MSYSTEM: $MSYSTEM" >&2; exit 1 ;;
+          esac
+
+          out="src/internal/llvm/toolchain/libc/windows_${TS_ARCH}"
           mkdir -p "$out"
 
-          crt2="$(find /clang64 -name crt2.o -print -quit 2>/dev/null || true)"
+          crt2="$(find "$PREFIX" -name crt2.o -print -quit 2>/dev/null || true)"
           if [ -z "$crt2" ]; then
-            echo "crt2.o not found under /clang64. Check that mingw-w64-clang-x86_64-crt-git is installed." >&2
+            echo "crt2.o not found under $PREFIX. Check that the mingw-w64 CRT package for $MSYSTEM is installed." >&2
             exit 1
           fi
           MINGW_LIB="$(dirname "$crt2")"
-          echo "MINGW_LIB: $MINGW_LIB"
-          ls "$MINGW_LIB" | head -n 50
+          echo "MSYSTEM: $MSYSTEM  PREFIX: $PREFIX  MINGW_LIB: $MINGW_LIB  OUT: $out"
 
           for f in crt2.o libmingw32.a libmingwex.a libmsvcrt.a; do
             cp "$MINGW_LIB/$f" "$out/"
           done
 
           for f in libucrt.a libgcc.a; do
-            src="$(find /clang64 -name "$f" -print -quit 2>/dev/null || true)"
+            src="$(find "$PREFIX" -name "$f" -print -quit 2>/dev/null || true)"
             if [ -n "$src" ]; then
               cp "$src" "$out/"
             else
-              echo "warning: $f not found under /clang64" >&2
+              echo "warning: $f not found under $PREFIX" >&2
             fi
           done
 
