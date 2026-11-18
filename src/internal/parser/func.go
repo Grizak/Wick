@@ -17,40 +17,13 @@ func (p *Parser) parseFuncDecl() (*ast.NodeFuncDecl, error) {
 		}
 	}
 
-	if _, err := p.expect(types.TokenOpenParen); err != nil {
-		return nil, err
-	}
-
-	var params []ast.NodeParam
-
-	token, err := p.peek(0)
+	params, err := p.parseParams()
 	if err != nil {
-		return nil, err
-	}
-	if token.Type != types.TokenCloseParen {
-		for {
-			decl, err := p.parseParam()
-			if err != nil {
-				return nil, err
-			}
-			params = append(params, *decl)
-
-			hasComma, err := p.tryConsume(types.TokenComma)
-			if err != nil {
-				return nil, err
-			}
-			if !hasComma {
-				break
-			}
-		}
-	}
-
-	if _, err := p.expect(types.TokenCloseParen); err != nil {
 		return nil, err
 	}
 
 	var returnType *string
-	token, err = p.peek(0)
+	token, err := p.peek(0)
 	if err != nil {
 		return nil, err
 	}
@@ -133,4 +106,40 @@ func (p *Parser) parseParam() (*ast.NodeParam, error) {
 		Default: defaultExpr,
 		Pos:     name.Pos,
 	}, nil
+}
+
+func (p *Parser) parseParams() ([]ast.NodeParam, error) {
+	var params []ast.NodeParam
+
+	if _, err := p.expect(types.TokenOpenParen); err != nil {
+		return nil, err
+	}
+
+	token, err := p.peek(0)
+	if err != nil {
+		return nil, err
+	}
+	if token.Type != types.TokenCloseParen {
+		for {
+			param, err := p.parseParam()
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, *param)
+
+			hasComma, err := p.tryConsume(types.TokenComma)
+			if err != nil {
+				return nil, err
+			}
+			if !hasComma {
+				break
+			}
+		}
+	}
+
+	if _, err := p.expect(types.TokenCloseParen); err != nil {
+		return nil, err
+	}
+
+	return params, nil
 }

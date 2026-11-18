@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,9 +14,6 @@ import (
 func TestParsePreservesProgramAndExpressionStructure(t *testing.T) {
 	program := parse(t, "sample.wk", `let answer: i64 = 2 + 3 * 4
 exit(answer)`)
-	if program.Filename != "sample.wk" {
-		t.Fatalf("filename = %q, want sample.wk", program.Filename)
-	}
 	if len(program.Statements) != 2 {
 		t.Fatalf("got %d statements, want 2", len(program.Statements))
 	}
@@ -51,9 +49,25 @@ func TestParseReturnsLocatedSyntaxAndLexerErrors(t *testing.T) {
 	})
 
 	t.Run("lexer error", func(t *testing.T) {
-		_, err := parseWithError(t, "broken.wk", "let value = @")
+		_, err := parseWithError(t, "broken.wk", "let value = $")
 		if err == nil || !strings.Contains(err.Error(), "unexpected character") {
 			t.Fatalf("expected lexer error, got %v", err)
+		}
+	})
+}
+
+func TestParseRequiresSeparatorsBetweenStatements(t *testing.T) {
+	t.Run("semicolon separator", func(t *testing.T) {
+		program := parse(t, "sample.wk", "let first = 1; let second = 2")
+		if len(program.Statements) != 2 {
+			t.Fatalf("got %d statements, want 2", len(program.Statements))
+		}
+	})
+
+	t.Run("missing separator", func(t *testing.T) {
+		_, err := parseWithError(t, "sample.wk", "let first = 1 let second = 2")
+		if err == nil || !strings.Contains(err.Error(), "expected semicolon or newline") {
+			t.Fatalf("expected separator error, got %v", err)
 		}
 	})
 }
@@ -71,5 +85,5 @@ func parseWithError(t *testing.T, filename, source string) (ast.NodeProgram, err
 	t.Helper()
 	input := make(chan types.LexerResult, len([]rune(source))+1)
 	lexer.NewLexer(source, filename).Tokenize(input)
-	return parser.NewParser(filename).Parse(input)
+	return parser.NewParser().Parse(input, filepath.Dir(filename))
 }

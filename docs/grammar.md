@@ -1,6 +1,6 @@
 $$
 \begin{align}
-  \text{Prog} &\to [\text{Stmt}]^* \\
+  \text{Prog} &\to \text{Sep}^* ([\text{Stmt}] (\text{Sep}^+ [\text{Stmt}])^*)? \text{Sep}^* \\
   [\text{Stmt}] &\to
   \begin{cases}
     \text{import} \ \text{string\_lit} \\
@@ -15,7 +15,8 @@ $$
     \text{for} \ [\text{Block}] \\
     \text{if} \ [\text{Expr}] \ [\text{Block}] \ [\text{else} \ [\text{Block}]]?
   \end{cases} \\
-  [\text{Block}] &\to \{ [\text{Stmt}]^* \} \\
+  [\text{Block}] &\to \{ \text{Sep}^* ([\text{Stmt}] (\text{Sep}^+ [\text{Stmt}])^*)? \text{Sep}^* \} \\
+  \text{Sep} &\to ; \mid \text{newline} \\
   [\text{ParamList}] &\to [\text{Param}] (,\ [\text{Param}])^* \\
   [\text{Param}] &\to \text{ident} [:\text{Type}]? [=\text{Expr}]? \\
   [\text{Type}] &\to [*]^* (\texttt{[}\ \text{int\_lit}\ \texttt{]})? \ (\text{i32} \mid \text{i64} \mid \text{f64} \mid \text{bool} \mid \text{string} \mid \text{int} \mid \text{float}) \\

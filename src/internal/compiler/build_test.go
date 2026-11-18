@@ -70,3 +70,27 @@ func TestValidateInputs(t *testing.T) {
 		t.Errorf("directory input error = %v", err)
 	}
 }
+
+func TestCompileInputsReturnsAfterAssembly(t *testing.T) {
+	if err := prepareLLVM(); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	input := filepath.Join(dir, "program.wk")
+	if err := os.WriteFile(input, []byte("exit(0)"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	object, _, err := compileInputs(BuildOptions{
+		Input:  []string{input},
+		Output: filepath.Join(dir, "program"),
+		Target: "linux/amd64",
+	})
+	if err != nil {
+		t.Fatalf("compileInputs: %v", err)
+	}
+	if _, err := os.Stat(object); err != nil {
+		t.Fatalf("compiled object %q: %v", object, err)
+	}
+}

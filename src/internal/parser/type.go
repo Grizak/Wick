@@ -17,8 +17,15 @@ func (p *Parser) parseType() (string, error) {
 	}
 
 	// Handle pointer types
-	for token.Type == types.TokenStar {
-		_, err := p.consume()
+	for {
+		tok, err := p.peek(0)
+		if err != nil {
+			return "", err
+		}
+		if tok.Type != types.TokenStar {
+			break
+		}
+		_, err = p.consume()
 		if err != nil {
 			return "", err
 		}
@@ -65,7 +72,7 @@ func (p *Parser) parseType() (string, error) {
 			return "", err
 		}
 		switch *token.Value {
-		case "i32", "i64", "f64", "bool", "string", "int", "float":
+		case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool", "string", "int", "float":
 			typeStr.WriteString(*token.Value)
 		default:
 			return "", p.error(fmt.Sprintf("unknown type: %s", *token.Value), token)
