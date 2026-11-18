@@ -296,6 +296,49 @@ jobs:
             cp "$lib" "$OUT/"
           done
 
+      - name: Copy musl libc + CRT (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          OUT="src/internal/llvm/toolchain/libc/${{ matrix.platform }}"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+
+          # musl-cross-make installs to $RUNNER_TEMP/musl-toolchain/<target>/lib
+          MUSL_LIB="$RUNNER_TEMP/musl-toolchain/${{ matrix.musl_target }}/lib"
+
+          # These are the files Wick needs to link against at compile time
+          cp "$MUSL_LIB/crt1.o" "$OUT/"
+          cp "$MUSL_LIB/crti.o" "$OUT/"
+          cp "$MUSL_LIB/crtn.o" "$OUT/"
+          cp "$MUSL_LIB/libc.a" "$OUT/"
+          cp "$MUSL_LIB/libm.a" "$OUT/"
+          # also useful later, not required for mini.wk:
+          cp "$MUSL_LIB/crtbegin.o" "$OUT/" || true
+          cp "$MUSL_LIB/crtend.o" "$OUT/" || true
+
+          ls -lh "$OUT/"
+
+      - name: Copy libSystem.tbd (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          SDK=$(xcrun --show-sdk-path)
+          echo "SDK: $SDK"
+
+          # The SDK .tbd is universal - it has both x86_64-macos and arm64-macos
+          # targets in one file, so we copy the same file to both folders.
+          for PLAT in darwin_arm64 darwin_amd64; do
+            OUT="src/internal/llvm/toolchain/libc/$PLAT"
+            rm -rf "$OUT"
+            mkdir -p "$OUT"
+            cp "$SDK/usr/lib/libSystem.tbd" "$OUT/"
+            cp "$SDK/usr/lib/libSystem.B.tbd" "$OUT/" || true
+            echo "--- $PLAT ---"
+            ls -lh "$OUT/"
+            grep -m1 "targets:" "$OUT/libSystem.tbd" || true
+          done
+
       - name: Verify outputs
         run: |
           set -euo pipefail
@@ -307,314 +350,198 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: |
             src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/libc/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/include/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/libc/darwin_amd64/
+            src/internal/llvm/toolchain/libc/darwin_arm64/
+            src/internal/llvm/toolchain/bin/${{ matrix.platform }}/
+
+  fetch-windows:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows_amd64
+            msystem: CLANG64
+            mingw_prefix: clang64
+            mingw_target: x86_64-w64-mingw32
+            sdk_arch: x64
+            artifact_name: windows-amd64-tools
+            msys_packages: >-
+              git
+              mingw-w64-clang-x86_64-gcc
+              mingw-w64-clang-x86_64-cmake
+              mingw-w64-clang-x86_64-ninja
+              mingw-w64-clang-x86_64-binutils
+              mingw-w64-clang-x86_64-python
+              mingw-w64-clang-x86_64-sccache
+          - os: windows-11-arm
+            platform: windows_arm64
+            msystem: CLANGARM64
+            mingw_prefix: clangarm64
+            mingw_target: aarch64-w64-mingw32
+            sdk_arch: arm64
+            artifact_name: windows-arm64-tools
+            msys_packages: >-
+              git
+              mingw-w64-clang-aarch64-clang
+              mingw-w64-clang-aarch64-cmake
+              mingw-w64-clang-aarch64-ninja
+              mingw-w64-clang-aarch64-binutils
+              mingw-w64-clang-aarch64-python
+              mingw-w64-clang-aarch64-sccache
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: false
+          install: ${{ matrix.msys_packages }}
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Start sccache
+        run: sccache --start-server
+
+      - name: Cleanup
+        run: |
+          rm -rf src/internal/llvm/toolchain/bin/${{ matrix.platform }}
+          rm -rf src/internal/llvm/toolchain/lib/${{ matrix.platform }}
+          rm -rf src/internal/llvm/toolchain/libc/${{ matrix.platform }}
+
+      - name: Clone LLVM
+        run: |
+          git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
+
+      - name: Build LLVM libraries and lld
+        run: |
+          cmake -S llvm-project/llvm -B llvm-project/build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_UTILS=OFF \
+            -DLLVM_INCLUDE_UTILS=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLD_BUILD_TOOLS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
+          cmake --build llvm-project/build
+
+      - name: Copy headers
+        run: |
+          root=src/internal/llvm/toolchain/include/${{ matrix.platform }}
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
+          cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
+          cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
+          cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          for flavor in ELF COFF MachO; do
+            mkdir -p "$root/lld/$flavor"
+            cp -R "llvm-project/lld/$flavor/." "$root/lld/$flavor/"
+          done
+          if [ -d llvm-project/build/include/llvm ]; then
+            cp -r llvm-project/build/include/llvm/. "$root/llvm/"
+          fi
+
+      - name: Copy static LLVM libraries
+        run: |
+          set -euo pipefail
+          out=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
+          rm -rf "$out"
+          mkdir -p "$out"
+          shopt -s nullglob
+          libs=(llvm-project/build/lib/*.a)
+          echo "Found ${#libs[@]} archives in llvm-project/build/lib"
+          if [ "${#libs[@]}" -eq 0 ]; then
+            ls -la llvm-project/build/lib || true
+            exit 1
+          fi
+          copied=0
+          for lib in "${libs[@]}"; do
+            case "$lib" in *.dll.a) continue ;; esac
+            cp "$lib" "$out/"
+            copied=$((copied + 1))
+          done
+          echo "Copied $copied archives into $out"
+
+      # --- this is the new part, same idea as Linux / macOS ---
+      - name: Copy kernel32.lib
+        run: |
+          out=src/internal/llvm/toolchain/libc/${{ matrix.platform }}
+          mkdir -p "$out"
+          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
+          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$sdk" ] || [ ! -f "${sdk}um/${{ matrix.sdk_arch }}/kernel32.lib" ]; then
+            echo "No ${{ matrix.sdk_arch }} kernel32.lib found in $sdk_lib"
+            ls "$sdk_lib"
+            exit 1
+          fi
+          echo "Using SDK ${sdk}"
+          cp "${sdk}um/${{ matrix.sdk_arch }}/kernel32.lib" "$out/kernel32.lib"
+
+      - name: Copy mingw CRT
+        run: |
+          set -euo pipefail
+          out=src/internal/llvm/toolchain/libc/${{ matrix.platform }}
+          mkdir -p "$out"
+          # CLANG64 -> /clang64/x86_64-w64-mingw32/lib/
+          # CLANGARM64 -> /clangarm64/aarch64-w64-mingw32/lib/
+          MINGW_LIB="/${{ matrix.mingw_prefix }}/${{ matrix.mingw_target }}/lib"
+          echo "MINGW_LIB: $MINGW_LIB"
+          ls "$MINGW_LIB" | head -n 50
+          cp "$MINGW_LIB/crt2.o" "$out/"
+          cp "$MINGW_LIB/libmingw32.a" "$out/" || true
+          cp "$MINGW_LIB/libmingwex.a" "$out/" || true
+          cp "$MINGW_LIB/libmsvcrt.a" "$out/" || true
+          cp "$MINGW_LIB/libgcc.a" "$out/" || true
+          cp "$MINGW_LIB/libucrt.a" "$out/" || true
+          ls -lh "$out/"
+
+      - name: Verify outputs
+        run: |
+          set -euo pipefail
+          out=src/internal/llvm/toolchain/lib/${{ matrix.platform }}
+          archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
+          if [ -z "$archives" ]; then
+            echo "No archives found in $out"
+            ls -la "$out" || true
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          path: |
+            src/internal/llvm/toolchain/libc/${{ matrix.platform }}/
+            src/internal/llvm/toolchain/lib/${{ matrix.platform }}/
             src/internal/llvm/toolchain/include/${{ matrix.platform }}/
 
-  fetch-windows-amd64:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          lfs: false
-
-      - name: Setup MSYS2 (CLANG64)
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: CLANG64
-          update: false
-          install: >-
-            git
-            mingw-w64-clang-x86_64-gcc
-            mingw-w64-clang-x86_64-cmake
-            mingw-w64-clang-x86_64-ninja
-            mingw-w64-clang-x86_64-binutils
-            mingw-w64-clang-x86_64-python
-            mingw-w64-clang-x86_64-sccache
-
-      - name: Join tailnet
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
-          tags: tag:ci
-
-      - name: Start sccache
-        run: sccache --start-server
-
-      - name: Cleanup
-        run: rm -rf src/internal/llvm/toolchain/bin/windows_amd64 src/internal/llvm/toolchain/lib/windows_amd64
-
-      - name: Clone LLVM
-        run: |
-          git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
-
-      - name: Build LLVM libraries and lld
-        run: |
-          cmake -S llvm-project/llvm -B llvm-project/build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_EXE_LINKER_FLAGS="-static" \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DLLVM_BUILD_TOOLS=OFF \
-            -DLLVM_BUILD_UTILS=OFF \
-            -DLLVM_INCLUDE_UTILS=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF \
-            -DLLVM_INCLUDE_TESTS=OFF \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS=lld \
-            -DLLD_BUILD_TOOLS=OFF \
-            -DLLVM_ENABLE_TERMINFO=OFF \
-            -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF \
-            -DLLVM_ENABLE_LIBXML2=OFF \
-            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
-
-          cmake --build llvm-project/build
-
-      - name: Copy headers
-        run: |
-          root=src/internal/llvm/toolchain/include/windows_amd64
-          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
-          cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
-          cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
-          cp -r llvm-project/lld/include/lld/. "$root/lld/"
-          for flavor in ELF COFF MachO; do
-            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
-            cp -R "llvm-project/lld/$flavor/." \
-              "$root/include/$PLATFORM/lld/$flavor/"
-          done
-          if [ -d llvm-project/build/include/llvm ]; then
-            cp -r llvm-project/build/include/llvm/. "$root/llvm/"
-          fi
-
-      - name: Copy static LLVM libraries
-        run: |
-          set -euo pipefail
-          out=src/internal/llvm/toolchain/lib/windows_amd64
-          rm -rf "$out"
-          mkdir -p "$out"
-
-          shopt -s nullglob
-          libs=(llvm-project/build/lib/*.a)
-          echo "Found ${#libs[@]} archives in llvm-project/build/lib"
-          if [ "${#libs[@]}" -eq 0 ]; then
-            echo "Build produced no .a files. Listing lib directory:"
-            ls -la llvm-project/build/lib || true
-            exit 1
-          fi
-
-          copied=0
-          for lib in "${libs[@]}"; do
-            case "$lib" in
-              *.dll.a) continue ;;
-            esac
-            cp "$lib" "$out/"
-            copied=$((copied + 1))
-          done
-          echo "Copied $copied archives into $out"
-          ls -la "$out"
-
-      - name: Copy kernel32.lib
-        run: |
-          out=src/internal/llvm/toolchain/libc/windows_amd64
-          mkdir -p "$out"
-
-          # Windows SDK version folders look like 10.0.26100.0
-          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
-          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
-
-          if [ -z "$sdk" ] || [ ! -f "${sdk}um/x64/kernel32.lib" ]; then
-            echo "No x64 kernel32.lib found in any SDK version under $sdk_lib"
-            ls "$sdk_lib"
-            exit 1
-          fi
-
-          echo "Using SDK ${sdk}"
-          cp "${sdk}um/x64/kernel32.lib" "$out/kernel32.lib"
-
-      - name: Verify outputs
-        run: |
-          set -euo pipefail
-          out=src/internal/llvm/toolchain/lib/windows_amd64
-          archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
-          if [ -z "$archives" ]; then
-            echo "No archives found in $out"
-            ls -la "$out" || true
-            exit 1
-          fi
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: windows-amd64-tools
-          if-no-files-found: error
-          path: |
-            src/internal/llvm/toolchain/libc/windows_amd64/
-            src/internal/llvm/toolchain/lib/windows_amd64/
-            src/internal/llvm/toolchain/include/windows_amd64/
-
-  fetch-windows-arm64:
-    runs-on: windows-11-arm
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          lfs: false
-
-      - name: Setup MSYS2 (CLANGARM64)
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: CLANGARM64
-          update: false
-          install: >-
-            git
-            mingw-w64-clang-aarch64-clang
-            mingw-w64-clang-aarch64-cmake
-            mingw-w64-clang-aarch64-ninja
-            mingw-w64-clang-aarch64-binutils
-            mingw-w64-clang-aarch64-python
-            mingw-w64-clang-aarch64-sccache
-
-      - name: Join tailnet
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
-          tags: tag:ci
-
-      - name: Start sccache
-        run: sccache --start-server
-
-      - name: Cleanup
-        run: rm -rf src/internal/llvm/toolchain/bin/windows_arm64 src/internal/llvm/toolchain/lib/windows_arm64
-
-      - name: Clone LLVM
-        run: |
-          git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project.git
-
-      - name: Build LLVM libraries and lld
-        run: |
-          cmake -S llvm-project/llvm -B llvm-project/build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
-            -DLLVM_USE_CRT_DEBUG=MT \
-            -DLLVM_USE_CRT_MINSIZEREL=MT \
-            -DLLVM_USE_CRT_RELEASE=MT \
-            -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
-            -DLLVM_BUILD_TOOLS=OFF \
-            -DLLVM_BUILD_UTILS=OFF \
-            -DLLVM_INCLUDE_UTILS=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF \
-            -DLLVM_INCLUDE_TESTS=OFF \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS=lld \
-            -DLLD_BUILD_TOOLS=OFF \
-            -DLLVM_ENABLE_TERMINFO=OFF \
-            -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF \
-            -DLLVM_ENABLE_LIBXML2=OFF \
-            -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
-
-          cmake --build llvm-project/build
-
-      - name: Copy headers
-        run: |
-          root=src/internal/llvm/toolchain/include/windows_arm64
-          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
-          cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
-          cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
-          cp -r llvm-project/lld/include/lld/. "$root/lld/"
-          for flavor in ELF COFF MachO; do
-            mkdir -p "$root/include/$PLATFORM/lld/$flavor"
-            cp -R "llvm-project/lld/$flavor/." \
-              "$root/include/$PLATFORM/lld/$flavor/"
-          done
-          if [ -d llvm-project/build/include/llvm ]; then
-            cp -r llvm-project/build/include/llvm/. "$root/llvm/"
-          fi
-
-      - name: Copy static LLVM libraries
-        run: |
-          set -euo pipefail
-          out=src/internal/llvm/toolchain/lib/windows_arm64
-          rm -rf "$out"
-          mkdir -p "$out"
-
-          shopt -s nullglob
-          libs=(llvm-project/build/lib/*.a)
-          echo "Found ${#libs[@]} archives in llvm-project/build/lib"
-          if [ "${#libs[@]}" -eq 0 ]; then
-            echo "Build produced no .a files. Listing lib directory:"
-            ls -la llvm-project/build/lib || true
-            exit 1
-          fi
-
-          copied=0
-          for lib in "${libs[@]}"; do
-            case "$lib" in
-              *.dll.a) continue ;;
-            esac
-            cp "$lib" "$out/"
-            copied=$((copied + 1))
-          done
-          echo "Copied $copied archives into $out"
-          ls -la "$out"
-
-      - name: Copy kernel32.lib
-        run: |
-          out=src/internal/llvm/toolchain/libc/windows_arm64
-          mkdir -p "$out"
-
-          # Windows SDK version folders look like 10.0.26100.0
-          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
-          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
-
-          if [ -z "$sdk" ] || [ ! -f "${sdk}um/arm64/kernel32.lib" ]; then
-            echo "No ARM64 kernel32.lib found in any SDK version under $sdk_lib"
-            ls "$sdk_lib"
-            exit 1
-          fi
-
-          echo "Using SDK ${sdk}"
-          cp "${sdk}um/arm64/kernel32.lib" "$out/kernel32.lib"
-
-      - name: Verify outputs
-        run: |
-          set -euo pipefail
-          out=src/internal/llvm/toolchain/lib/windows_arm64
-          archives=$(find "$out" -maxdepth 1 -name '*.a' 2>/dev/null || true)
-          if [ -z "$archives" ]; then
-            echo "No archives found in $out"
-            ls -la "$out" || true
-            exit 1
-          fi
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: windows-arm64-tools
-          if-no-files-found: error
-          path: |
-            src/internal/llvm/toolchain/libc/windows_arm64/
-            src/internal/llvm/toolchain/lib/windows_arm64/
-            src/internal/llvm/toolchain/include/windows_arm64/
-
   commit:
-    needs: [fetch-unix, fetch-windows-amd64, fetch-windows-arm64]
+    needs: [fetch-unix, fetch-windows]
     runs-on: [self-hosted, lfs-home]
     permissions:
       contents: write
