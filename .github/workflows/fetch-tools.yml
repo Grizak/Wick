@@ -84,7 +84,7 @@ jobs:
         run: |
           mkdir -p musl-cross-make/sources
 
-          cp vendor/gnu/config.sub musl-cross-make/sources/config.sub
+          cp ci/vendor/gnu/config.sub musl-cross-make/sources/config.sub
 
       - name: Configure musl-cross-make for static builds (Linux)
         if: runner.os == 'Linux'
