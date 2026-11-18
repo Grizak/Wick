@@ -160,6 +160,11 @@ func (g *Generator) generateReturn(node *ast.NodeReturn) error {
 
 func (g *Generator) generateFuncCall(call *ast.NodeFuncCall) (llvm.Value, error) {
 	sym, exists := g.scope.lookup(call.Name)
+	if !exists && g.currentProgram != nil {
+		if m, ok := g.moduleFunctions[programPath(g.currentProgram)]; ok {
+			sym, exists = m[call.Name]
+		}
+	}
 	if call.Module != "" {
 		var importNode *ast.NodeImport
 		if g.currentProgram != nil {

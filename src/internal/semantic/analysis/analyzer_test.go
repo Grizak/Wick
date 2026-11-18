@@ -100,7 +100,7 @@ func parseTestProgram(t *testing.T, filename, source string) ast.NodeProgram {
 	lex := lexer.NewLexer(source, filename)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
-	program, err := parser.NewParser().Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens, filepath.Dir(filename))
 	if err != nil {
 		t.Fatalf("parse program: %v", err)
 	}

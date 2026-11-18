@@ -126,7 +126,7 @@ type NodeImport struct {
 
 type NodeExtern struct {
 	Name       string
-	Params     []*NodeParam
+	Params     *[]NodeParam
 	ReturnType *string
 	Pos        types.Position
 }

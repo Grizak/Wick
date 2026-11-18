@@ -9,6 +9,10 @@ import (
 func Assemble(mod *llvm.Module, outFile string, save bool, targetMachine llvm.TargetMachine) (string, error) {
 	buf, err := targetMachine.EmitToMemoryBuffer(*mod, llvm.ObjectFile)
 	if err != nil {
+		ir := mod.String()
+		if err := os.WriteFile(outFile+".ll", []byte(ir), 0664); err != nil {
+			return "", err
+		}
 		return "", err
 	}
 

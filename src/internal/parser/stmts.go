@@ -1,8 +1,11 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/types"
+	"github.com/Grizak/Wick/src/internal/utils"
 )
 
 func (p *Parser) parseBlock() (*ast.NodeBlock, error) {
@@ -27,12 +30,29 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 	var stmts []ast.NodeStatement
 
 	for {
+		utils.Debug("[parseStatements loop]")
+		tok, _ := p.peek(0)
+		utils.Debug(fmt.Sprintf("[parseStatements peek=%s]", tok.Type))
+
 		token, err := p.peek(0)
 		if err != nil {
 			return nil, err
 		}
 
+		if token.Type == types.TokenSemicolon || token.Type == types.TokenNewline {
+			if _, err := p.consume(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
 		if token.Type == terminator {
+			return stmts, nil
+		}
+		if token.Type == types.TokenEOF {
+			if terminator != types.TokenEOF {
+				return nil, p.error("unexpected end of file", token)
+			}
 			return stmts, nil
 		}
 
@@ -151,14 +171,40 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				return nil, err
 			}
 			stmts = append(stmts, ast.NodeStatement{Import: importstmt})
-		case types.TokenExtern:
-			externStmt, err := p.parseExternStmt()
+		case types.TokenAt:
+			if _, err := p.consume(); err != nil {
+				return nil, err
+			}
+			token, err := p.peek(0)
 			if err != nil {
 				return nil, err
 			}
-			stmts = append(stmts, ast.NodeStatement{Extern: externStmt})
+			switch token.Type {
+			case types.TokenExtern:
+				if _, err := p.consume(); err != nil {
+					return nil, err
+				}
+				externStmt, err := p.parseExternStmt()
+				if err != nil {
+					return nil, err
+				}
+				stmts = append(stmts, ast.NodeStatement{Extern: externStmt})
+			default:
+				return nil, p.error("unexpected token", token)
+			}
 		default:
 			return nil, p.error("unexpected token", token)
+		}
+
+		token, err = p.peek(0)
+		if err != nil {
+			return nil, err
+		}
+		if token.Type != terminator && token.Type != types.TokenEOF &&
+			token.Type != types.TokenSemicolon && token.Type != types.TokenNewline {
+			if err := p.expectSep(); err != nil {
+				return nil, err
+			}
 		}
 	}
 }

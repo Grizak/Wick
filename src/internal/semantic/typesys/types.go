@@ -93,6 +93,9 @@ func (tc *TypeChecker) CheckStatement(stmt *ast.NodeStatement) error {
 	if stmt.Continue != nil {
 		return tc.CheckContinue(stmt.Continue)
 	}
+	if stmt.Extern != nil {
+		return tc.CheckExtern(stmt.Extern)
+	}
 	if stmt.Import != nil {
 		return nil
 	}
@@ -197,7 +200,7 @@ func (tc *TypeChecker) CheckBinaryOp(expr *ast.NodeBinExpr, left, right types.Ty
 
 func isNumeric(t types.Type) bool {
 	switch t.(type) {
-	case *Int64Type, *Int32Type, *FloatType:
+	case *Int64Type, *Int32Type, *Int8Type, *FloatType:
 		return true
 	}
 	return false
@@ -214,6 +217,13 @@ func isBool(t types.Type) bool {
 }
 
 func (tc *TypeChecker) error(msg string, pos *types.Position) *types.CompileError {
+	if pos == nil {
+		return &types.CompileError{
+			File: "",
+			Pos:  &types.Position{},
+			Msg:  msg,
+		}
+	}
 	return &types.CompileError{
 		File: pos.Filename,
 		Pos:  pos,
@@ -320,6 +330,14 @@ func TryCoerce(from, to types.Type) bool {
 		// Allow coercion between numeric types (e.g. int to float)
 		return true
 	}
+	// Allow string literal -> *i8 (C string, e.g. puts("hi\n"))
+	if _, isStr := from.(*StringType); isStr {
+		if ptr, isPtr := to.(*PointerType); isPtr {
+			if _, isInt8 := ptr.PointsTo.(*Int8Type); isInt8 {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -364,6 +382,8 @@ func (tc *TypeChecker) ParseTypeString(typeStr string) (types.Type, error) {
 
 	// Handle base types
 	switch typeStr {
+	case "i8":
+		return &Int8Type{}, nil
 	case "i32":
 		return &Int32Type{}, nil
 	case "i64", "int":
