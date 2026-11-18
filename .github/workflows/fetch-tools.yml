@@ -509,17 +509,22 @@ jobs:
       - name: Copy mingw CRT
         run: |
           set -euo pipefail
-          out=src/internal/llvm/toolchain/libc/${{ matrix.platform }}
+          out=src/internal/llvm/toolchain/libc/windows_amd64
           mkdir -p "$out"
-          # CLANG64 -> /clang64/x86_64-w64-mingw32/lib/
-          # CLANGARM64 -> /clangarm64/aarch64-w64-mingw32/lib/
-          MINGW_LIB="/${{ matrix.mingw_prefix }}/${{ matrix.mingw_target }}/lib"
+
+          crt2="$(find /clang64 -name crt2.o -print -quit 2>/dev/null || true)"
+          if [ -z "$crt2" ]; then
+            echo "crt2.o not found under /clang64. Check that mingw-w64-clang-x86_64-crt-git is installed." >&2
+            exit 1
+          fi
+          MINGW_LIB="$(dirname "$crt2")"
           echo "MINGW_LIB: $MINGW_LIB"
           ls "$MINGW_LIB" | head -n 50
-          cp "$MINGW_LIB/crt2.o" "$out/"
-          cp "$MINGW_LIB/libmingw32.a" "$out/" || true
-          cp "$MINGW_LIB/libmingwex.a" "$out/" || true
-          cp "$MINGW_LIB/libmsvcrt.a" "$out/" || true
+
+          for f in crt2.o libmingw32.a libmingwex.a libmsvcrt.a; do
+            cp "$MINGW_LIB/$f" "$out/"
+          done
+
           for f in libucrt.a libgcc.a; do
             src="$(find /clang64 -name "$f" -print -quit 2>/dev/null || true)"
             if [ -n "$src" ]; then
