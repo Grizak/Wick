@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added FFI
+
 ## [v4.4.1] - 2026-11-12
 
 - Bugfixes for linker flags to make cross-linking work

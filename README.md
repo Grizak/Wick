@@ -12,6 +12,7 @@ A compiled, statically typed programming language with a clean, Python-inspired 
 - `for` loops (infinite, while-style, and C-style)
 - `break`/`continue`
 - Namespaced modules
+- FFI to C
 - Compiles to native executables via LLVM IR
 - Self-contained compiler binary — no external dependencies required
 - Cross-compilation support
