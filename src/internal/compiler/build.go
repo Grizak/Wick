@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,6 +57,10 @@ func Build(opts BuildOptions) error {
 		return err
 	}
 
+	for i := range libs {
+		libs[i] = fmt.Sprintf("-l%s", libs[i])
+	}
+
 	linker.Link(object, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target], append(opts.Ldflags, libs...))
 
 	return nil
@@ -109,20 +112,10 @@ func validateInputs(inputs []string) error {
 }
 
 func compileInputs(opts BuildOptions) (string, []string, error) {
-	objects := make([]string, len(opts.Input))
-
-	type result struct {
-		index      int
-		outputFile string
-		err        error
-	}
-
 	targetTriple := target.TargetTriples[opts.Target]
 
 	optimizer.Initialize()
 	defer optimizer.Deinitialize()
-
-	results := make(chan result, len(opts.Input))
 
 	context := llvm.NewContext()
 	defer context.Dispose()
@@ -132,7 +125,9 @@ func compileInputs(opts BuildOptions) (string, []string, error) {
 		return "", nil, err
 	}
 	targetMachine := llvmTarget.CreateTargetMachine(
-		targetTriple, "generic", "",
+		targetTriple,
+		"generic", // Cpu type
+		"", // Cpu features
 		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
 	)
 	defer targetMachine.Dispose()
@@ -142,7 +137,7 @@ func compileInputs(opts BuildOptions) (string, []string, error) {
 		for _, input := range opts.Input {
 			content, err := os.ReadFile(input)
 			if err != nil {
-				output <- types.LexerResult{Err: &types.CompileError{Msg: fmt.Sprintf("err: %w", fmt.Errorf("Failed to read file %s: %w", input, err))}}
+				output <- types.LexerResult{Err: &types.CompileError{Msg: fmt.Sprintf("err: Failed to read file %s: %v", input, err)}}
 			}
 			lexer := lexer.NewLexer(string(content), input)
 			lexer.Tokenize(output)
@@ -192,21 +187,6 @@ func compileInputs(opts BuildOptions) (string, []string, error) {
 
 	if err != nil {
 		return "", nil, fmt.Errorf("assemble failed: %w", err)
-	}
-
-	// Collect results and handle errors
-	var errs = make([]error, len(opts.Input))
-
-	for r := range results {
-		if r.err != nil {
-			errs[r.index] = fmt.Errorf("%s: %w", opts.Input[r.index], r.err)
-		} else {
-			objects[r.index] = r.outputFile
-		}
-	}
-
-	if err := errors.Join(errs...); err != nil {
-		return "", nil, fmt.Errorf("compilation failed:\n%w", err)
 	}
 
 	return objFile, parser.Libs, nil

@@ -2,12 +2,14 @@ package codegen
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
 	"github.com/Grizak/Wick/src/internal/target"
 	"github.com/Grizak/Wick/src/internal/types"
+	"github.com/Grizak/Wick/src/internal/utils"
 	"tinygo.org/x/go-llvm"
 )
 
@@ -65,9 +67,9 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 	g.globalScope = g.scope
 	g.currentProgram = g.root
 
-	voidType := ctx.VoidType()
-	entryType := llvm.FunctionType(voidType, nil, false)
-	entry := llvm.AddFunction(mod, target.EntryPoint(), entryType)
+	i32Type := ctx.Int32Type()
+	entryType := llvm.FunctionType(i32Type, nil, false)
+	entry := llvm.AddFunction(mod, "main", entryType)
 	entryBlock := ctx.AddBasicBlock(entry, "entry")
 
 	exitFn, err := g.createExitFunction()
@@ -112,10 +114,15 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 		}
 	}
 	if !g.currentBlockTerminated() {
-		builder.CreateRetVoid()
+		zero := llvm.ConstInt(i32Type, 0, false)
+		builder.CreateRet(zero)
 	}
 
 	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
+		ir := mod.String()
+		if err := os.WriteFile("debug.ll", []byte(ir), 0644); err != nil {
+			return err
+		}
 		return err
 	}
 	return nil
@@ -152,6 +159,7 @@ func (g *Generator) generateImport(importNode *ast.NodeImport) error {
 }
 
 func (g *Generator) generateModule(program *ast.NodeProgram) error {
+	utils.Debug(fmt.Sprintf("generateModule called for: %s", programPath(program)))
 	modulePath := programPath(program)
 	if g.generatedModules[modulePath] {
 		return nil
@@ -208,6 +216,19 @@ func (g *Generator) generateModule(program *ast.NodeProgram) error {
 	}
 	g.moduleFunctions[modulePath] = make(map[string]Symbol)
 	for _, stmt := range program.Statements {
+		utils.Debug(fmt.Sprintf("MODULE STMT: file=%s Extern=%v VarDecl=%v FuncDeclInVar=%v Import=%v\n",
+			programPath(program),
+			stmt.Extern != nil,
+			stmt.VarDecl != nil,
+			stmt.VarDecl != nil && stmt.VarDecl.Expr.FuncDecl != nil,
+			stmt.Import != nil),
+		)
+		if stmt.Extern != nil {
+			if err := g.generateExtern(stmt.Extern); err != nil {
+				return err
+			}
+			continue
+		}
 		if stmt.VarDecl == nil || stmt.VarDecl.Expr.FuncDecl == nil {
 			continue
 		}
@@ -225,9 +246,25 @@ func (g *Generator) generateModule(program *ast.NodeProgram) error {
 }
 
 func programPath(program *ast.NodeProgram) string {
-	path, err := filepath.Abs(program.Dir)
+	path := program.Dir
+	for _, stmt := range program.Statements {
+		switch {
+		case stmt.Import != nil:
+			if stmt.Import.Pos.Filename != "" {
+				path = stmt.Import.Pos.Filename
+			}
+		case stmt.VarDecl != nil:
+			if stmt.VarDecl.Pos.Filename != "" {
+				path = stmt.VarDecl.Pos.Filename
+			}
+		}
+		if path != program.Dir {
+			break
+		}
+	}
+	path, err := filepath.Abs(path)
 	if err != nil {
-		return filepath.Clean(program.Dir)
+		return filepath.Clean(path)
 	}
 	return filepath.Clean(path)
 }
@@ -299,7 +336,7 @@ func (g *Generator) generateExit(exit *ast.NodeExit) error {
 
 func (g *Generator) error(msg string, pos types.Position) *types.CompileError {
 	return &types.CompileError{
-		File: g.fileName,
+		File: pos.Filename,
 		Pos:  &pos,
 		Msg:  msg,
 	}
@@ -365,6 +402,18 @@ func (g *Generator) coerceValue(value llvm.Value, from, to types.Type, name stri
 	if from.Equals(to) {
 		return value, nil
 	}
+
+	// string -> *i8 (C string)
+	// A string literal already generates a *i8 pointer,
+	// so there's nothing to convert — just pass it through.
+	if _, isStr := from.(*typesys.StringType); isStr {
+		if ptr, isPtr := to.(*typesys.PointerType); isPtr {
+			if _, isInt8 := ptr.PointsTo.(*typesys.Int8Type); isInt8 {
+				return value, nil
+			}
+		}
+	}
+
 	fromType := g.llvmType(from)
 	toType := g.llvmType(to)
 

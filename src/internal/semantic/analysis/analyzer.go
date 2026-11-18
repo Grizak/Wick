@@ -35,7 +35,14 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	if err := a.validateTopLevelImports(prog); err != nil {
 		return err
 	}
-	rootPath, err := filepath.Abs(prog.Dir)
+	rootPath := prog.Dir
+	for _, stmt := range prog.Statements {
+		if stmt.Import != nil && stmt.Import.Pos.Filename != "" {
+			rootPath = stmt.Import.Pos.Filename
+			break
+		}
+	}
+	rootPath, err := filepath.Abs(rootPath)
 	if err != nil {
 		return fmt.Errorf("resolve source path %q: %w", prog.Dir, err)
 	}

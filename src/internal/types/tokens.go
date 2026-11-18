@@ -42,8 +42,10 @@ const (
 	TokenFunctionDecl TokenType = "fn"
 	TokenReturnStmt   TokenType = "return"
 	TokenImport       TokenType = "import"
-	TokenExtern       TokenType = "@extern"
+	TokenExtern       TokenType = "extern"
 	TokenLibs         TokenType = "libs"
+	TokenNewline      TokenType = "newline" // Not actual token name
+	TokenAt           TokenType = "@"
 )
 
 type Token struct {

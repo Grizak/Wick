@@ -41,7 +41,7 @@ exit(result)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
 
-	program, err := parser.NewParser().Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens, ".")
 	if err != nil {
 		t.Fatalf("parse test program: %v", err)
 	}
@@ -92,7 +92,7 @@ exit(result)`
 	lex := lexer.NewLexer(source, rootPath)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
-	program, err := parser.NewParser().Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens, filepath.Dir(rootPath))
 	if err != nil {
 		t.Fatalf("parse test program: %v", err)
 	}

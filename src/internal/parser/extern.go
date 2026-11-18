@@ -7,6 +7,7 @@ import (
 
 func (p *Parser) parseExternStmt() (*ast.NodeExtern, error) {
 	var externNode ast.NodeExtern
+
 	_, err := p.expect(types.TokenOpenParen)
 	if err != nil {
 		return nil, err
@@ -41,6 +42,50 @@ func (p *Parser) parseExternStmt() (*ast.NodeExtern, error) {
 			return nil, err
 		}
 		p.AddLibs(*token.Value)
+	}
+
+	_, err = p.expect(types.TokenCloseParen)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.tryConsumeSep()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.expect(types.TokenFunctionDecl)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err = p.expect(types.TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	externNode.Name = *token.Value
+	externNode.Pos = token.Pos
+
+	params, err := p.parseParams()
+	if err != nil {
+		return nil, err
+	}
+	externNode.Params = &params
+
+	token, err = p.peek(0)
+	if err != nil {
+		return nil, err
+	}
+	if token.Type == types.TokenColon {
+		_, err = p.consume()
+		if err != nil {
+			return nil, err
+		}
+		token, err = p.expect(types.TokenIdent)
+		if err != nil {
+			return nil, err
+		}
+		externNode.ReturnType = token.Value
 	}
 
 	return &externNode, nil

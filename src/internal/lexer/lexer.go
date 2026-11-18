@@ -4,6 +4,7 @@ import (
 	"unicode"
 
 	"github.com/Grizak/Wick/src/internal/types"
+	"github.com/Grizak/Wick/src/internal/utils"
 )
 
 const (
@@ -27,6 +28,7 @@ var singleCharTokens = map[rune]types.TokenType{
 	':': types.TokenColon,
 	//'=': types.TokenEquals, // Handled by lexOperator
 	';': types.TokenSemicolon,
+	'@': types.TokenAt,
 }
 
 var keywords = map[string]types.TokenType{
@@ -43,7 +45,7 @@ var keywords = map[string]types.TokenType{
 	"fn":       types.TokenFunctionDecl,
 	"return":   types.TokenReturnStmt,
 	"import":   types.TokenImport,
-	"@extern":  types.TokenExtern,
+	"extern":   types.TokenExtern,
 	"libs":     types.TokenLibs,
 }
 
@@ -52,6 +54,7 @@ type Lexer struct {
 	index   int
 	line    int
 	column  int
+	depth   int
 	file    string
 }
 
@@ -60,19 +63,40 @@ func NewLexer(content, filename string) *Lexer {
 		content: []rune(content),
 		line:    1,
 		column:  1,
+		depth:   0,
 		file:    filename,
 	}
 }
 
 func (t *Lexer) Tokenize(output chan types.LexerResult) {
-	defer close(output)
+	defer func() {
+		close(output)
+		utils.Debug("Close output")
+	}()
 
 	for {
 		r := t.peek(0)
 
 		if r == EOF {
+			utils.Debug("output EOF")
 			output <- types.LexerResult{Token: types.Token{Type: types.TokenEOF, Pos: t.pos()}}
 			return
+		}
+
+		for _, char := range []string{"(", ")", "[", "]"} {
+			if r == rune(char[0]) {
+				if r == '(' || r == '[' {
+					t.depth++
+				} else {
+					t.depth--
+				}
+			}
+		}
+
+		if r == '\n' && t.depth == 0 {
+			output <- types.LexerResult{Token: types.Token{Type: types.TokenNewline, Pos: t.pos()}}
+			t.consume()
+			continue
 		}
 
 		if unicode.IsSpace(r) {
@@ -86,7 +110,8 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 		}
 
 		if r == '<' || r == '>' || r == '=' || r == '!' {
-			if !t.lexOperator(output) {
+			if!t.lexOperator(output) {
+				utils.Debug("lexOperator fail")
 				return
 			}
 			continue
@@ -94,6 +119,7 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 
 		if r == '"' {
 			if !t.lexString(output) {
+				utils.Debug("lexString fail")
 				return
 			}
 			continue
@@ -108,6 +134,7 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 
 		if unicode.IsDigit(r) {
 			if !t.lexNumber(output) {
+				utils.Debug("lexNumber fail")
 				return
 			}
 			continue
@@ -115,6 +142,7 @@ func (t *Lexer) Tokenize(output chan types.LexerResult) {
 
 		if unicode.IsLetter(r) || r == '_' {
 			if !t.lexIdentifier(output) {
+				utils.Debug("lexIdentifier fail")
 				return
 			}
 			continue
