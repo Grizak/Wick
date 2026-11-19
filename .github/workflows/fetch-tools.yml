@@ -481,28 +481,12 @@ jobs:
           done
           echo "Copied $copied archives into $out"
 
-      # --- this is the new part, same idea as Linux / macOS ---
-      - name: Copy kernel32.lib
-        run: |
-          out=src/internal/llvm/toolchain/libc/${{ matrix.platform }}
-          mkdir -p "$out"
-          sdk_lib="/c/Program Files (x86)/Windows Kits/10/Lib"
-          sdk=$(ls -d "$sdk_lib"/[0-9]*.[0-9]*.[0-9]*.[0-9]*/ 2>/dev/null | sort -V | tail -n1)
-          if [ -z "$sdk" ] || [ ! -f "${sdk}um/${{ matrix.sdk_arch }}/kernel32.lib" ]; then
-            echo "No ${{ matrix.sdk_arch }} kernel32.lib found in $sdk_lib"
-            ls "$sdk_lib"
-            exit 1
-          fi
-          echo "Using SDK ${sdk}"
-          cp "${sdk}um/${{ matrix.sdk_arch }}/kernel32.lib" "$out/kernel32.lib"
-
       - name: Copy mingw CRT
         run: |
           set -euo pipefail
-
           case "$MSYSTEM" in
-            CLANG64)    PREFIX=/clang64 ;;
-            CLANGARM64) PREFIX=/clangarm64 ;;
+            CLANG64) PREFIX=/clang64; TRIPLE=x86_64; ;;
+            CLANGARM64) PREFIX=/clangarm64; TRIPLE=aarch64; ;;
             *) echo "unsupported MSYSTEM: $MSYSTEM" >&2; exit 1 ;;
           esac
 
@@ -511,24 +495,35 @@ jobs:
 
           crt2="$(find "$PREFIX" -name crt2.o -print -quit 2>/dev/null || true)"
           if [ -z "$crt2" ]; then
-            echo "crt2.o not found under $PREFIX. Check that the mingw-w64 CRT package for $MSYSTEM is installed." >&2
-            exit 1
+            echo "crt2.o not found under $PREFIX" >&2; exit 1
           fi
           MINGW_LIB="$(dirname "$crt2")"
-          echo "MSYSTEM: $MSYSTEM  PREFIX: $PREFIX  MINGW_LIB: $MINGW_LIB  OUT: $out"
+          echo "MSYSTEM: $MSYSTEM PREFIX: $PREFIX MINGW_LIB: $MINGW_LIB OUT: $out"
 
-          for f in crt2.o libmingw32.a libmingwex.a libmsvcrt.a; do
-            cp "$MINGW_LIB/$f" "$out/"
-          done
-
-          for f in libucrt.a libgcc.a; do
-            src="$(find "$PREFIX" -name "$f" -print -quit 2>/dev/null || true)"
-            if [ -n "$src" ]; then
-              cp "$src" "$out/"
+          # 1. CRT + import libs — all in same dir as crt2.o
+          for f in crt2.o crtexe.o crtend.o libmingw32.a libmingwex.a libmsvcrt.a libucrt.a libkernel32.a; do
+            if [ -f "$MINGW_LIB/$f" ]; then
+              cp "$MINGW_LIB/$f" "$out/"
             else
-              echo "warning: $f not found under $PREFIX" >&2
+              echo "warning: $f not found in $MINGW_LIB" >&2
             fi
           done
+
+          # 2. Stack probe / builtins — libgcc.a on GCC, compiler-rt on Clang
+          libgcc="$(find "$PREFIX" -name "libgcc.a" -print -quit 2>/dev/null || true)"
+          if [ -n "$libgcc" ]; then
+            cp "$libgcc" "$out/libgcc.a"
+          else
+            # CLANG64/ARM64: use compiler-rt builtins as libgcc.a
+            builtins="$(find "$PREFIX/lib/clang" -name "libclang_rt.builtins-${TRIPLE}.a" -print -quit 2>/dev/null || true)"
+            if [ -n "$builtins" ]; then
+              echo "Using compiler-rt builtins as libgcc.a: $builtins"
+              cp "$builtins" "$out/libgcc.a"
+            else
+              echo "ERROR: neither libgcc.a nor libclang_rt.builtins-${TRIPLE}.a found" >&2
+              exit 1
+            fi
+          fi
 
           ls -lh "$out/"
 
