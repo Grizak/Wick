@@ -493,35 +493,28 @@ jobs:
           out="src/internal/llvm/toolchain/libc/windows_${TS_ARCH}"
           mkdir -p "$out"
 
-          crt2="$(find "$PREFIX" -name crt2.o -print -quit 2>/dev/null || true)"
-          if [ -z "$crt2" ]; then
-            echo "crt2.o not found under $PREFIX" >&2; exit 1
-          fi
-          MINGW_LIB="$(dirname "$crt2")"
-          echo "MSYSTEM: $MSYSTEM PREFIX: $PREFIX MINGW_LIB: $MINGW_LIB OUT: $out"
-
-          # 1. CRT + import libs — all in same dir as crt2.o
+          # Copy by searching whole PREFIX, not just crt2.o's dir
           for f in crt2.o crtexe.o crtend.o libmingw32.a libmingwex.a libmsvcrt.a libucrt.a libkernel32.a; do
-            if [ -f "$MINGW_LIB/$f" ]; then
-              cp "$MINGW_LIB/$f" "$out/"
+            src="$(find "$PREFIX" -name "$f" -print -quit 2>/dev/null || true)"
+            if [ -n "$src" ]; then
+              echo "Copy $f from $src"
+              cp "$src" "$out/"
             else
-              echo "warning: $f not found in $MINGW_LIB" >&2
+              echo "ERROR: $f not found under $PREFIX" >&2
+              exit 1
             fi
           done
 
-          # 2. Stack probe / builtins — libgcc.a on GCC, compiler-rt on Clang
+          # libgcc.a or compiler-rt fallback
           libgcc="$(find "$PREFIX" -name "libgcc.a" -print -quit 2>/dev/null || true)"
           if [ -n "$libgcc" ]; then
             cp "$libgcc" "$out/libgcc.a"
           else
-            # CLANG64/ARM64: use compiler-rt builtins as libgcc.a
             builtins="$(find "$PREFIX/lib/clang" -name "libclang_rt.builtins-${TRIPLE}.a" -print -quit 2>/dev/null || true)"
             if [ -n "$builtins" ]; then
-              echo "Using compiler-rt builtins as libgcc.a: $builtins"
               cp "$builtins" "$out/libgcc.a"
             else
-              echo "ERROR: neither libgcc.a nor libclang_rt.builtins-${TRIPLE}.a found" >&2
-              exit 1
+              echo "ERROR: no libgcc / builtins found" >&2; exit 1
             fi
           fi
 
