@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [v4.5.0] - 2026-11-20
+
+- Added bare function call support
 - Added FFI
 
 ## [v4.4.1] - 2026-11-12

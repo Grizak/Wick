@@ -149,6 +149,24 @@ imported filename without its extension. Imported files may contain function
 declarations and further imports; top-level executable statements and variables
 are not supported in imported modules. Imports are only allowed at the top level.
 
+### FFI
+Import functions from another programming language
+
+```bash
+@extern("c")
+fn puts(msg: *i8): i32
+
+puts("hello world")
+```
+
+If the imported function exists in libc or libm, you don't need to specify anything,
+if it doesn't, you have to specify the lib in the extern decorator:
+
+```bash
+@extern("c", libs = "pthread")
+fn pthread_create(...) // For example
+```
+
 ## Building from Source
 
 Requires Go 1.26.2+.
