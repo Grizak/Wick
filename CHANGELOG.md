@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.5.4] - 2026-11-20
+
+- Updated packages script (again)
+
 ## [v4.5.3] - 2026-11-20
 
 - Updated packages script
