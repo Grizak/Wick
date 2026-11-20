@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Grizak/Wick/src/internal/target"
+	"tinygo.org/x/go-llvm"
 )
 
 func TestValidateConfigOptimizationBounds(t *testing.T) {
@@ -68,5 +71,43 @@ func TestValidateInputs(t *testing.T) {
 	}
 	if err := validateInputs([]string{dir}); err == nil || !strings.Contains(err.Error(), "not a regular file") {
 		t.Errorf("directory input error = %v", err)
+	}
+}
+
+func TestCompileInputsReturnsAfterAssembly(t *testing.T) {
+	if err := prepareLLVM(); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	input := filepath.Join(dir, "program.wk")
+	if err := os.WriteFile(input, []byte("exit(0)"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	targetTriple := target.TargetTriples["linux/amd64"]
+
+	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		t.Fatalf("getTargetFromTriple: %s, %v", targetTriple, err)
+	}
+	tm := llvmTarget.CreateTargetMachine(
+		targetTriple,
+		"generic", // Cpu type
+		"",        // Cpu features
+		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
+	)
+	defer tm.Dispose()
+
+	object, _, err := compileInputs(BuildOptions{
+		Input:  []string{input},
+		Output: filepath.Join(dir, "program"),
+		Target: "linux/amd64",
+	}, tm)
+	if err != nil {
+		t.Fatalf("compileInputs: %v", err)
+	}
+	if _, err := os.Stat(object); err != nil {
+		t.Fatalf("compiled object %q: %v", object, err)
 	}
 }

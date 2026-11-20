@@ -6,11 +6,12 @@ import (
 
 type NodeProgram struct {
 	Statements []NodeStatement
-	Filename   string
+	Dir        string
 }
 
 type NodeStatement struct {
 	Exit      *NodeExit
+	FuncCall  *NodeFuncCall
 	VarDecl   *NodeVarDecl
 	VarAssign *NodeVarAssign
 	Block     *NodeBlock
@@ -20,6 +21,7 @@ type NodeStatement struct {
 	Continue  *NodeContinue
 	Return    *NodeReturn
 	Import    *NodeImport
+	Extern    *NodeExtern
 }
 
 type NodeExit struct {
@@ -121,4 +123,11 @@ type NodeImport struct {
 	ResolvedPath string
 	Program      *NodeProgram
 	Pos          types.Position
+}
+
+type NodeExtern struct {
+	Name       string
+	Params     *[]NodeParam
+	ReturnType *string
+	Pos        types.Position
 }

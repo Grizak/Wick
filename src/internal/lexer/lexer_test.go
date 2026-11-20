@@ -9,14 +9,14 @@ import (
 
 func TestTokenizeValuesOperatorsAndPositions(t *testing.T) {
 	input := `let café = 12.5 + 3 * "hi" // comment
-exit(café >= 4)`
+exit(café >= 4);`
 	results := tokenize(t, input)
 
 	wantTypes := []types.TokenType{
 		types.TokenLet, types.TokenIdent, types.TokenEquals, types.TokenFloatLit,
 		types.TokenPlus, types.TokenIntLit, types.TokenStar, types.TokenStringLit,
-		types.TokenExit, types.TokenOpenParen, types.TokenIdent, types.TokenGtEq,
-		types.TokenIntLit, types.TokenCloseParen, types.TokenEOF,
+		types.TokenNewline, types.TokenExit, types.TokenOpenParen, types.TokenIdent,
+		types.TokenGtEq, types.TokenIntLit, types.TokenCloseParen, types.TokenSemicolon, types.TokenEOF,
 	}
 	if len(results) != len(wantTypes) {
 		t.Fatalf("got %d results, want %d", len(results), len(wantTypes))
@@ -33,10 +33,10 @@ exit(café >= 4)`
 	if got := *results[1].Token.Value; got != "café" {
 		t.Errorf("identifier = %q, want café", got)
 	}
-	if got := results[1].Token.Pos; got != (types.Position{Line: 1, Column: 5, Index: 4}) {
+	if got := results[1].Token.Pos; got != (types.Position{Line: 1, Column: 5, Index: 4, Filename: "test.wk"}) {
 		t.Errorf("identifier position = %+v, want line 1, column 5, index 4", got)
 	}
-	if got := results[8].Token.Pos.Line; got != 2 {
+	if got := results[9].Token.Pos.Line; got != 2 {
 		t.Errorf("exit token line = %d, want 2", got)
 	}
 }
@@ -48,7 +48,7 @@ func TestTokenizeRejectsUnexpectedAndUnterminatedInput(t *testing.T) {
 		wantErr    string
 		wantColumn int
 	}{
-		{name: "unexpected character", input: "let x = @", wantErr: "unexpected character", wantColumn: 9},
+		{name: "unexpected character", input: "let x = $", wantErr: "unexpected character", wantColumn: 9},
 		{name: "standalone bang", input: "!", wantErr: "unexpected character '!'", wantColumn: 1},
 		{name: "unterminated string", input: `"unterminated`, wantErr: "unterminated string literal", wantColumn: 14},
 	}

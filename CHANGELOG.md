@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [v4.5.1] - 2026-11-20
+
+- Reran fetch tools to make the macos build work
+
+## [v4.5.0] - 2026-11-20
+
+- Added bare function call support
+- Added FFI
+
 ## [v4.4.1] - 2026-11-12
 
 - Bugfixes for linker flags to make cross-linking work
