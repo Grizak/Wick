@@ -3,12 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-<<<<<<< HEAD
-      - master
-||||||| empty tree
-=======
       - pages-pre-push
->>>>>>> origin/dev
     paths:
       - "website/**"
       - "release-notes/**"
