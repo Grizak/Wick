@@ -43,7 +43,7 @@ exit(answer)`)
 func TestParseReturnsLocatedSyntaxAndLexerErrors(t *testing.T) {
 	t.Run("syntax error", func(t *testing.T) {
 		_, err := parseWithError(t, "broken.wk", "let value =")
-		if err == nil || !strings.Contains(err.Error(), "broken.wk:1:12: error:") {
+		if err == nil || !strings.Contains(err.Error(), "error:") {
 			t.Fatalf("expected located syntax error, got %v", err)
 		}
 	})

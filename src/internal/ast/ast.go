@@ -11,6 +11,7 @@ type NodeProgram struct {
 
 type NodeStatement struct {
 	Exit      *NodeExit
+	FuncCall  *NodeFuncCall
 	VarDecl   *NodeVarDecl
 	VarAssign *NodeVarAssign
 	Block     *NodeBlock

@@ -273,6 +273,7 @@ func (g *Generator) createExitFunction() (llvm.Value, error) {
 	i32 := g.context.Int32Type()
 	fnType := llvm.FunctionType(g.context.VoidType(), []llvm.Type{i32}, false)
 	exitFn := llvm.AddFunction(g.module, "exit", fnType)
+	exitFn.SetLinkage(llvm.InternalLinkage)
 	entry := g.context.AddBasicBlock(exitFn, "entry")
 	g.builder.SetInsertPointAtEnd(entry)
 

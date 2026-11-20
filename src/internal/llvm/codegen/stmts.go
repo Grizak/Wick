@@ -42,6 +42,9 @@ func (g *Generator) generateStatement(stmt *ast.NodeStatement) error {
 		return g.generateImport(stmt.Import)
 	case stmt.Extern != nil:
 		return g.generateExtern(stmt.Extern)
+	case stmt.FuncCall != nil:
+		_, err := g.generateFuncCall(stmt.FuncCall)
+		return err
 	default:
 		return nil
 	}

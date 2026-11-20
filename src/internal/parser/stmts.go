@@ -89,14 +89,21 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 			if err != nil {
 				return nil, err
 			}
-			if next.Type == types.TokenEquals {
+			switch next.Type {
+			case types.TokenEquals:
 				assign, err := p.parseVarAssign()
 				if err != nil {
 					return nil, err
 				}
 				stmts = append(stmts, ast.NodeStatement{VarAssign: assign})
-			} else {
-				return nil, p.error("expected `=` after identifier", token)
+			case types.TokenOpenParen:
+				call, err := p.parseFuncCall()
+				if err != nil {
+					return nil, err
+				}
+				stmts = append(stmts, ast.NodeStatement{FuncCall: &call})
+			default:
+				return nil, p.error("expected `=` or `(` after identifier", token)
 			}
 		case types.TokenOpenBrace:
 			block, err := p.parseBlock()

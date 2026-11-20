@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"tinygo.org/x/go-llvm"
+	"github.com/Grizak/Wick/src/internal/target"
 )
 
 func TestValidateConfigOptimizationBounds(t *testing.T) {
@@ -82,11 +85,25 @@ func TestCompileInputsReturnsAfterAssembly(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	targetTriple := target.TargetTriples["linux/amd64"]
+
+	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		t.Fatalf("getTargetFromTriple: %s, %v", targetTriple, err)
+	}
+	tm := llvmTarget.CreateTargetMachine(
+		targetTriple,
+		"generic", // Cpu type
+		"", // Cpu features
+		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
+	)
+	defer tm.Dispose()
+
 	object, _, err := compileInputs(BuildOptions{
 		Input:  []string{input},
 		Output: filepath.Join(dir, "program"),
 		Target: "linux/amd64",
-	})
+	}, tm)
 	if err != nil {
 		t.Fatalf("compileInputs: %v", err)
 	}

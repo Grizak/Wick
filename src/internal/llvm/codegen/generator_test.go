@@ -62,7 +62,7 @@ exit(result)
 	}
 
 	ir := mod.String()
-	for _, expected := range []string{"define void @_start()", "define i64 @func_0", "br i1"} {
+	for _, expected := range []string{"define i32 @main()", "define i64 @func_0", "br i1"} {
 		if !strings.Contains(ir, expected) {
 			t.Errorf("generated IR does not contain %q:\n%s", expected, ir)
 		}

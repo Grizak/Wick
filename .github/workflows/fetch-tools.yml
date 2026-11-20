@@ -493,15 +493,22 @@ jobs:
           out="src/internal/llvm/toolchain/libc/windows_${TS_ARCH}"
           mkdir -p "$out"
 
-          # Copy by searching whole PREFIX, not just crt2.o's dir
-          for f in crt2.o crtexe.o crtend.o libmingw32.a libmingwex.a libmsvcrt.a libucrt.a libkernel32.a; do
+          for f in crt2.o crtend.o libmingw32.a libmingwex.a libmsvcrt.a libucrt.a libkernel32.a; do
             src="$(find "$PREFIX" -name "$f" -print -quit 2>/dev/null || true)"
             if [ -n "$src" ]; then
               echo "Copy $f from $src"
               cp "$src" "$out/"
             else
-              echo "ERROR: $f not found under $PREFIX" >&2
-              exit 1
+              echo "ERROR: $f not found under $PREFIX" >&2; exit 1
+            fi
+          done
+
+          for f in crtexe.o; do
+            src="$(find "$PREFIX" -name "$f" -print -quit 2>/dev/null || true)"
+            if [ -n "$src" ]; then
+              cp "$src" "$out/"
+            else
+              echo "note: $f not present in MSYS2 (merged into crt2.o), skipping"
             fi
           done
 
