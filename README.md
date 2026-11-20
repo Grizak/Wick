@@ -12,6 +12,7 @@ A compiled, statically typed programming language with a clean, Python-inspired 
 - `for` loops (infinite, while-style, and C-style)
 - `break`/`continue`
 - Namespaced modules
+- FFI to C
 - Compiles to native executables via LLVM IR
 - Self-contained compiler binary — no external dependencies required
 - Cross-compilation support
@@ -147,6 +148,25 @@ Import paths are resolved relative to the importing file. The namespace is the
 imported filename without its extension. Imported files may contain function
 declarations and further imports; top-level executable statements and variables
 are not supported in imported modules. Imports are only allowed at the top level.
+
+### FFI
+
+Import functions from another programming language
+
+```bash
+@extern("c")
+fn puts(msg: *i8): i32
+
+puts("hello world")
+```
+
+If the imported function exists in libc or libm, you don't need to specify anything,
+if it doesn't, you have to specify the lib in the extern decorator:
+
+```bash
+@extern("c", libs = "pthread")
+fn pthread_create(...) // For example
+```
 
 ## Building from Source
 

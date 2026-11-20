@@ -41,7 +41,7 @@ exit(result)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
 
-	program, err := parser.NewParser("test.wk").Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens, ".")
 	if err != nil {
 		t.Fatalf("parse test program: %v", err)
 	}
@@ -57,12 +57,12 @@ exit(result)
 	if err != nil {
 		t.Fatalf("create target: %v", err)
 	}
-	if err := NewGenerator(&program, "test.wk").Generate(mod, target, builder, ctx); err != nil {
+	if err := NewGenerator(&program).Generate(mod, target, builder, ctx); err != nil {
 		t.Fatalf("generate LLVM module: %v", err)
 	}
 
 	ir := mod.String()
-	for _, expected := range []string{"define void @_start()", "define i64 @func_0", "br i1"} {
+	for _, expected := range []string{"define i32 @main()", "define i64 @func_0", "br i1"} {
 		if !strings.Contains(ir, expected) {
 			t.Errorf("generated IR does not contain %q:\n%s", expected, ir)
 		}
@@ -92,11 +92,11 @@ exit(result)`
 	lex := lexer.NewLexer(source, rootPath)
 	tokens := make(chan types.LexerResult, 4096)
 	go lex.Tokenize(tokens)
-	program, err := parser.NewParser(rootPath).Parse(tokens)
+	program, err := parser.NewParser().Parse(tokens, filepath.Dir(rootPath))
 	if err != nil {
 		t.Fatalf("parse test program: %v", err)
 	}
-	if err := analysis.NewAnalyzer(rootPath).CheckProgram(&program); err != nil {
+	if err := analysis.NewAnalyzer().CheckProgram(&program); err != nil {
 		t.Fatalf("analyze test program: %v", err)
 	}
 
@@ -111,7 +111,7 @@ exit(result)`
 	if err != nil {
 		t.Fatalf("create target: %v", err)
 	}
-	if err := NewGenerator(&program, rootPath).Generate(mod, target, builder, ctx); err != nil {
+	if err := NewGenerator(&program).Generate(mod, target, builder, ctx); err != nil {
 		t.Fatalf("generate LLVM module: %v", err)
 	}
 

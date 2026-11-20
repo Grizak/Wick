@@ -1,12 +1,10 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"github.com/Grizak/Wick/src/internal/lexer"
 	"github.com/Grizak/Wick/src/internal/llvm/assembler"
@@ -54,12 +52,33 @@ func Build(opts BuildOptions) error {
 
 	toolchain.Init()
 
-	objects, err := compileInputs(opts)
+	targetTriple := target.TargetTriples[opts.Target]
+
+	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		return err
+	}
+	tm := llvmTarget.CreateTargetMachine(
+		targetTriple,
+		"generic", // Cpu type
+		"",        // Cpu features
+		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
+	)
+	defer tm.Dispose()
+
+	object, libs, err := compileInputs(opts, tm)
 	if err != nil {
 		return err
 	}
 
-	linker.Link(objects, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target], opts.Ldflags)
+	for i := range libs {
+		libs[i] = fmt.Sprintf("-l%s", libs[i])
+	}
+
+	err = linker.Link(object, opts.Output, opts.SaveIntermediaries, targetTriple, append(opts.Ldflags, libs...), tm)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -109,105 +128,46 @@ func validateInputs(inputs []string) error {
 	return nil
 }
 
-func compileInputs(opts BuildOptions) ([]string, error) {
-	objects := make([]string, len(opts.Input))
-
-	type result struct {
-		index      int
-		outputFile string
-		err        error
-	}
-
+func compileInputs(opts BuildOptions, tm llvm.TargetMachine) (string, []string, error) {
 	targetTriple := target.TargetTriples[opts.Target]
 
 	optimizer.Initialize()
 	defer optimizer.Deinitialize()
 
-	results := make(chan result, len(opts.Input))
-	var wg sync.WaitGroup
-
-	for i := range opts.Input {
-		wg.Add(1)
-		go func(input string, index int) {
-			defer wg.Done()
-
-			obj, err := compileFile(input, opts.Output, targetTriple, opts.SaveIntermediaries, index, opts.Opt)
-
-			if err != nil {
-				results <- result{err: err, index: index}
-				return
-			}
-
-			results <- result{outputFile: obj, index: index}
-		}(opts.Input[i], i)
-	}
-
-	// Close results once all goroutines finish
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	// Collect results and handle errors
-	var errs = make([]error, len(opts.Input))
-
-	for r := range results {
-		if r.err != nil {
-			errs[r.index] = fmt.Errorf("%s: %w", opts.Input[r.index], r.err)
-		} else {
-			objects[r.index] = r.outputFile
-		}
-	}
-
-	if err := errors.Join(errs...); err != nil {
-		return nil, fmt.Errorf("compilation failed:\n%w", err)
-	}
-
-	return objects, nil
-}
-
-func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bool, idx, opt int) (string, error) {
 	context := llvm.NewContext()
 	defer context.Dispose()
 
-	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
-	if err != nil {
-		return "", err
-	}
-	targetMachine := llvmTarget.CreateTargetMachine(
-		targetTriple, "generic", "",
-		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
-	)
-	defer targetMachine.Dispose()
-
-	content, err := os.ReadFile(input)
-	if err != nil {
-		return "", fmt.Errorf("Failed to read input file %s: %v\n", input, err)
-	}
-
-	lexer := lexer.NewLexer(string(content), input)
 	output := make(chan types.LexerResult, 4096)
-	go lexer.Tokenize(output)
+	go func() {
+		for _, input := range opts.Input {
+			content, err := os.ReadFile(input)
+			if err != nil {
+				output <- types.LexerResult{Err: &types.CompileError{Msg: fmt.Sprintf("err: Failed to read file %s: %v", input, err)}}
+			}
+			lexer := lexer.NewLexer(string(content), input)
+			lexer.Tokenize(output)
+		}
+	}()
 
-	parser := parser.NewParser(input)
-	program, err := parser.Parse(output)
+	parser := parser.NewParser()
+	program, err := parser.Parse(output, filepath.Dir(opts.Input[0]))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	sa := analysis.NewAnalyzer(input)
+	sa := analysis.NewAnalyzer()
 	if err := sa.CheckProgram(&program); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	generator := codegen.NewGenerator(&program, input)
+	generator := codegen.NewGenerator(&program)
 
-	mod := context.NewModule(input)
+	mod := context.NewModule("main.wk")
 	defer mod.Dispose()
 
 	target, err := target.NewTarget(targetTriple)
 	if err != nil {
-		return "", fmt.Errorf("failed to create target for %s: %w", input, err)
+		return "", nil, fmt.Errorf("failed to create target: %w", err)
 	}
 
 	mod.SetDataLayout(target.DataLayout())
@@ -219,20 +179,20 @@ func compileFile(input, outputPrefix, targetTriple string, saveIntermediaries bo
 	err = generator.Generate(mod, target, builder, context)
 
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	if opt > 0 {
-		if err := optimizer.Optimize(&mod, opt, targetMachine); err != nil {
-			return "", err
+	if opts.Opt > 0 {
+		if err := optimizer.Optimize(&mod, opts.Opt, tm); err != nil {
+			return "", nil, err
 		}
 	}
 
-	objFile, err := assembler.Assemble(&mod, outputPrefix, saveIntermediaries, idx, targetMachine)
+	objFile, err := assembler.Assemble(&mod, opts.Output, opts.SaveIntermediaries, tm)
 
 	if err != nil {
-		return "", fmt.Errorf("assemble failed for %s: %w", input, err)
+		return "", nil, fmt.Errorf("assemble failed: %w", err)
 	}
 
-	return objFile, nil
+	return objFile, parser.Libs, nil
 }
