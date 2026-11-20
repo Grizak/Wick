@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -41,22 +42,28 @@ func run() error {
 		}
 	}
 
-	runtimeFiles, err := filepath.Glob("install/**/*")
+	err = filepath.WalkDir("install", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel("install", path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(runtimeDir, rel)
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyFile(path, dst)
+	})
 	if err != nil {
 		return err
 	}
-	for _, file := range runtimeFiles {
-		if info, err := os.Stat(file); err == nil && !info.IsDir() {
-			dst := filepath.Join(runtimeDir, file)
-			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-				return err
-			}
-			if err := copyFile(file, dst); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
