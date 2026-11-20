@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseTypeString(t *testing.T) {
-	checker := typesys.NewTypeChecker("types.wk")
+	checker := typesys.NewTypeChecker()
 	tests := []struct {
 		input string
 		name  string

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Grizak/Wick/src/internal/compiler"
+	"github.com/Grizak/Wick/src/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,6 +27,10 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	if target == "" {
 		target = runtime.GOOS + "/" + runtime.GOARCH
+	}
+
+	if viper.GetBool("debug") {
+		utils.SetDebug()
 	}
 
 	return compiler.Build(

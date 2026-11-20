@@ -1,5 +1,6 @@
 $$
 \begin{align}
+<<<<<<< HEAD
   \text{Prog} &\to [\text{Stmt}]^* \\
   [\text{Stmt}] &\to
   \begin{cases}
@@ -16,6 +17,26 @@ $$
     \text{if} \ [\text{Expr}] \ [\text{Block}] \ [\text{else} \ [\text{Block}]]?
   \end{cases} \\
   [\text{Block}] &\to \{ [\text{Stmt}]^* \} \\
+||||||| empty tree
+=======
+  \text{Prog} &\to \text{Sep}^* ([\text{Stmt}] (\text{Sep}^+ [\text{Stmt}])^*)? \text{Sep}^* \\
+  [\text{Stmt}] &\to
+  \begin{cases}
+    \text{import} \ \text{string\_lit} \\
+    \text{fn} \ \text{ident} \ ([\text{ParamList}]?) \ [:\text{Type}]? \ [\text{Block}] \\
+    [\text{Expr}] \\
+    [\text{Cmp}] \\
+    [\text{Term}] \\
+    [\text{Factor}] \\
+    \ldots \\
+    \text{for} \ [\text{Expr}] \ [\text{Block}] \\
+    \text{for} \ [\text{Stmt}] ; [\text{Expr}] ; [\text{Stmt}] \ [\text{Block}] \\
+    \text{for} \ [\text{Block}] \\
+    \text{if} \ [\text{Expr}] \ [\text{Block}] \ [\text{else} \ [\text{Block}]]?
+  \end{cases} \\
+  [\text{Block}] &\to \{ \text{Sep}^* ([\text{Stmt}] (\text{Sep}^+ [\text{Stmt}])^*)? \text{Sep}^* \} \\
+  \text{Sep} &\to ; \mid \text{newline} \\
+>>>>>>> origin/dev
   [\text{ParamList}] &\to [\text{Param}] (,\ [\text{Param}])^* \\
   [\text{Param}] &\to \text{ident} [:\text{Type}]? [=\text{Expr}]? \\
   [\text{Type}] &\to [*]^* (\texttt{[}\ \text{int\_lit}\ \texttt{]})? \ (\text{i32} \mid \text{i64} \mid \text{f64} \mid \text{bool} \mid \text{string} \mid \text{int} \mid \text{float}) \\

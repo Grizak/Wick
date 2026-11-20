@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/types"
@@ -21,7 +22,28 @@ func (g *Generator) generateExpression(expr ast.NodeExpression) (llvm.Value, err
 		}
 		return llvm.ConstInt(g.context.Int1Type(), value, false), nil
 	case expr.StringLit != nil:
-		return llvm.Value{}, g.error("string literals not yet supported in code generation", expr.Pos)
+		// Unescape \n, \t, \", \\, etc.
+		s, err := strconv.Unquote(`"` + *expr.StringLit + `"`)
+		if err != nil {
+			s = *expr.StringLit // already unescaped by parser
+		}
+
+		// Unique global name per literal.
+		name := fmt.Sprintf(".str.%d", g.funcCount)
+		g.funcCount++
+
+		// [N x i8] global, with \0 terminator for C.
+		strConst := llvm.ConstString(s, true)
+		global := llvm.AddGlobal(g.module, strConst.Type(), name)
+		global.SetInitializer(strConst)
+		global.SetLinkage(llvm.PrivateLinkage)
+		global.SetUnnamedAddr(true)
+		global.SetAlignment(1)
+
+		// Creates the global + the correctly-typed *i8 pointer.
+		// Handles the GEP / bitcast so the call sees an i8*, not a [N x i8]*.
+		ptr := g.builder.CreateGlobalStringPtr(s, g.newValueName(".str"))
+		return ptr, nil
 	}
 
 	if staticValue := g.computeStaticValue(expr); staticValue != nil {
