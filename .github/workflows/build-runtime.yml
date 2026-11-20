@@ -37,7 +37,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies (Linux)
         if: startsWith(matrix.os, 'ubuntu')
@@ -65,7 +65,7 @@ jobs:
           cmake --build runtime/build
           cmake --install runtime/build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: runtime-${{ matrix.platform }}
           path: install/${{ matrix.platform }}
@@ -75,12 +75,18 @@ jobs:
     needs: build
     runs-on: [self-hosted, lfs-home]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref_name }}
           lfs: true
 
-      - uses: actions/download-artifact@v4
+      - name: Configure Forgejo credentials for LFS
+        run: |
+          umask 077
+          printf 'machine git.isaksweb.xyz\nlogin %s\npassword %s\n' \
+            "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
+
+      - uses: actions/download-artifact@v6
         with:
           pattern: runtime-*
           path: install/ # each artifact lands in its own subfolder
@@ -97,3 +103,7 @@ jobs:
           git commit -m "Update runtime artifacts [skip ci]"
           git pull --rebase
           git push
+
+      - name: Remove Forgejo credentials
+        if: always()
+        run: rm -f "$HOME/.netrc"
