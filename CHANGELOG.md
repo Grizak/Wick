@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [v4.5.3] - 2026-11-20
+
+- Updated packages script
+
 ## [v4.5.2] - 2026-11-20
 
 - Updated linux repo's script to actally function
