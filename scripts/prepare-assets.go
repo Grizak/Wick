@@ -10,6 +10,7 @@ import (
 const (
 	assetsDir    = "src/internal/assets"
 	changelogDir = "src/internal/assets/changelog"
+	runtimeDir   = "src/internal/llvm/toolchain/runtime"
 )
 
 func main() {
@@ -39,6 +40,23 @@ func run() error {
 			return err
 		}
 	}
+
+	runtimeFiles, err := filepath.Glob("install/**/*")
+	if err != nil {
+		return err
+	}
+	for _, file := range runtimeFiles {
+		if info, err := os.Stat(file); err == nil && !info.IsDir() {
+			dst := filepath.Join(runtimeDir, file)
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return err
+			}
+			if err := copyFile(file, dst); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -14,9 +14,7 @@ LDFLAGS_HOST = $(shell $(ROOT)/scripts/llvm-ldflags.sh $(GOOS_HOST)_$(GOARCH_HOS
 
 version := $(shell git tag --sort=-version:refname | head -1 2>/dev/null || echo "v0.0.0")
 
-dev:
-	mkdir -p $(dir $(DEV_OUT))
-	go run ./scripts/prepare-assets.go
+dev: assets
 	CC=$(MUSL_CC) \
 	CXX=$(MUSL_CXX) \
 	CGO_ENABLED=1 \
@@ -56,3 +54,7 @@ package:
 
 setup:
 	git config core.hooksPath .githooks
+
+assets:
+	mkdir -p $(dir $(DEV_OUT))
+	go run ./scripts/prepare-assets.go

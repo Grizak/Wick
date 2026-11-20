@@ -6,3 +6,4 @@ src/tools/bin/** filter=lfs diff=lfs merge=lfs -text
 **/versions.json !text -filter -merge -diff
 toolchains/** filter=lfs diff=lfs merge=lfs -text
 src/internal/llvm/toolchain/libc/** filter=lfs diff=lfs merge=lfs -text
+install/*/lib/** filter=lfs diff=lfs merge=lfs -text
