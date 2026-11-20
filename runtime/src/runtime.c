@@ -1,4 +1,5 @@
 #include "args/args.h"
+#include <stdio.h>
 
 extern int wick_main_main();
 
