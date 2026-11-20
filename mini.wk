@@ -1,5 +1,5 @@
-@extern("c", libs = "c")
+@extern("c")
 fn puts(msg: *i8): i32
 
-let n = puts("hi")
-exit(n)
+puts("hello world")
+

@@ -52,7 +52,21 @@ func Build(opts BuildOptions) error {
 
 	toolchain.Init()
 
-	object, libs, err := compileInputs(opts)
+	targetTriple := target.TargetTriples[opts.Target]
+
+	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
+	if err != nil {
+		return err
+	}
+	tm := llvmTarget.CreateTargetMachine(
+		targetTriple,
+		"generic", // Cpu type
+		"", // Cpu features
+		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
+	)
+	defer tm.Dispose()
+
+	object, libs, err := compileInputs(opts, tm)
 	if err != nil {
 		return err
 	}
@@ -61,7 +75,10 @@ func Build(opts BuildOptions) error {
 		libs[i] = fmt.Sprintf("-l%s", libs[i])
 	}
 
-	linker.Link(object, opts.Output, opts.SaveIntermediaries, target.TargetTriples[opts.Target], append(opts.Ldflags, libs...))
+	err = linker.Link(object, opts.Output, opts.SaveIntermediaries, targetTriple, append(opts.Ldflags, libs...), tm)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -111,7 +128,7 @@ func validateInputs(inputs []string) error {
 	return nil
 }
 
-func compileInputs(opts BuildOptions) (string, []string, error) {
+func compileInputs(opts BuildOptions, tm llvm.TargetMachine) (string, []string, error) {
 	targetTriple := target.TargetTriples[opts.Target]
 
 	optimizer.Initialize()
@@ -119,18 +136,6 @@ func compileInputs(opts BuildOptions) (string, []string, error) {
 
 	context := llvm.NewContext()
 	defer context.Dispose()
-
-	llvmTarget, err := llvm.GetTargetFromTriple(targetTriple)
-	if err != nil {
-		return "", nil, err
-	}
-	targetMachine := llvmTarget.CreateTargetMachine(
-		targetTriple,
-		"generic", // Cpu type
-		"", // Cpu features
-		llvm.CodeGenLevelDefault, llvm.RelocDefault, llvm.CodeModelDefault,
-	)
-	defer targetMachine.Dispose()
 
 	output := make(chan types.LexerResult, 4096)
 	go func() {
@@ -178,12 +183,12 @@ func compileInputs(opts BuildOptions) (string, []string, error) {
 	}
 
 	if opts.Opt > 0 {
-		if err := optimizer.Optimize(&mod, opts.Opt, targetMachine); err != nil {
+		if err := optimizer.Optimize(&mod, opts.Opt, tm); err != nil {
 			return "", nil, err
 		}
 	}
 
-	objFile, err := assembler.Assemble(&mod, opts.Output, opts.SaveIntermediaries, targetMachine)
+	objFile, err := assembler.Assemble(&mod, opts.Output, opts.SaveIntermediaries, tm)
 
 	if err != nil {
 		return "", nil, fmt.Errorf("assemble failed: %w", err)

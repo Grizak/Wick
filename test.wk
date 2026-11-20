@@ -1,7 +1,7 @@
 import "math.wk"
 
 // Test import c
-@extern("c", libs = "c")
+@extern("c")
 fn puts(message: *i8): i32
 
 let sum = fn(upper: i64 = 10): i64 {
@@ -15,6 +15,6 @@ let sum = fn(upper: i64 = 10): i64 {
 // 1+2+3+4+...+19+20 = 210
 let s = math.divide(sum(20), 21)
 
-let n = puts("hi")
+let n = puts("hello world")
 
 exit(s+n) // echo $? == 13

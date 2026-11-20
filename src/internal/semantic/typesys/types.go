@@ -99,6 +99,9 @@ func (tc *TypeChecker) CheckStatement(stmt *ast.NodeStatement) error {
 	if stmt.Import != nil {
 		return nil
 	}
+	if stmt.FuncCall != nil {
+		return nil
+	}
 	return tc.error("unknown statement type", nil)
 }
 

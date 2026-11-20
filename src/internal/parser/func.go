@@ -143,3 +143,61 @@ func (p *Parser) parseParams() ([]ast.NodeParam, error) {
 
 	return params, nil
 }
+
+func (p *Parser) parseFuncCall() (ast.NodeFuncCall, error) {
+	token, err := p.consume()
+	if err != nil {
+		return ast.NodeFuncCall{}, err
+	}
+	module := ""
+	name := *token.Value
+	if token, err := p.peek(0); err != nil {
+		return ast.NodeFuncCall{}, err
+	} else if token.Type == types.TokenDot {
+		_, err := p.consume()
+		if err != nil {
+			return ast.NodeFuncCall{}, err
+		}
+		member, err := p.expect(types.TokenIdent)
+		if err != nil {
+			return ast.NodeFuncCall{}, err
+		}
+		module = name
+		name = *member.Value
+	}
+	_, err = p.consume() // consume (
+	if err != nil {
+		return ast.NodeFuncCall{}, err
+	}
+	var args []ast.NodeExpression
+	if token, err := p.peek(0); err != nil {
+		return ast.NodeFuncCall{}, err
+	} else if token.Type != types.TokenCloseParen {
+		for {
+			arg, err := p.parseExpression()
+			if err != nil {
+				return ast.NodeFuncCall{}, err
+			}
+			args = append(args, arg)
+			if token, err := p.peek(0); err != nil {
+				return ast.NodeFuncCall{}, err
+			} else if token.Type != types.TokenComma {
+				break
+			}
+			_, err = p.consume() // consume comma
+			if err != nil {
+				return ast.NodeFuncCall{}, err
+			}
+		}
+	}
+	_, err = p.expect(types.TokenCloseParen)
+	if err != nil {
+		return ast.NodeFuncCall{}, err
+	}
+	return ast.NodeFuncCall{
+		Module: module,
+		Name:   name,
+		Args:   args,
+		Pos:    token.Pos,
+	}, nil
+}
