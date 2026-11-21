@@ -19,7 +19,7 @@ int atoi(const char *str) {
   return (int)strtol(str, NULL, 10);
 }
 
-char *strlen(const char *str) {
+int wick_strlen(const char *str) {
   return strlen(str);
 }
 
