@@ -10,6 +10,16 @@ on:
 permissions:
   contents: write
 
+env:
+  SCCACHE_BUCKET: sccache
+  SCCACHE_ENDPOINT: http://100.125.229.8:3900
+  SCCACHE_REGION: garage
+  SCCACHE_S3_USE_SSL: "off"
+  AWS_ACCESS_KEY_ID: ${{ secrets.GARAGE_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
+
 concurrency:
   group: build-runtime
   cancel-in-progress: true
@@ -41,6 +51,21 @@ jobs:
         with:
           lfs: false
 
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
+      
       - name: Install dependencies (Linux)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
@@ -87,6 +112,10 @@ jobs:
           umask 077
           printf 'machine git.isaksweb.xyz\nlogin %s\npassword %s\n' \
             "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
+      
+      - name: Clean dir
+        run: |
+          rm -rf install
 
       - uses: actions/download-artifact@v6
         with:
