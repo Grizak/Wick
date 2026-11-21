@@ -20,7 +20,7 @@ int atoi(const char *str) {
 }
 
 char *strlen(const char *str) {
-  return strmerge((char *)str, strlen(str));
+  return strlen(str);
 }
 
 char *strmerge(const char *str1, const char *str2) {
