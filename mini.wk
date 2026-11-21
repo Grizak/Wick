@@ -2,4 +2,3 @@
 fn puts(msg: *i8): i32
 
 puts("hello world")
-

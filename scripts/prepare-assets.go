@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -10,6 +11,7 @@ import (
 const (
 	assetsDir    = "src/internal/assets"
 	changelogDir = "src/internal/assets/changelog"
+	runtimeDir   = "src/internal/llvm/toolchain/runtime"
 )
 
 func main() {
@@ -38,6 +40,29 @@ func run() error {
 		if err := copyFile(note, filepath.Join(changelogDir, filepath.Base(note))); err != nil {
 			return err
 		}
+	}
+
+	err = filepath.WalkDir("install", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel("install", path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(runtimeDir, rel)
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyFile(path, dst)
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }

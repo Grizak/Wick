@@ -1,0 +1,140 @@
+name: Build runtime
+
+on:
+  push:
+    paths:
+      - "runtime/**"
+      - ".github/workflows/build-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SCCACHE_BUCKET: sccache
+  SCCACHE_ENDPOINT: http://100.125.229.8:3900
+  SCCACHE_REGION: garage
+  SCCACHE_S3_USE_SSL: "off"
+  AWS_ACCESS_KEY_ID: ${{ secrets.GARAGE_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
+
+concurrency:
+  group: build-runtime
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+          - os: macos-15
+            platform: macos-arm64
+          - os: macos-15-intel
+            platform: macos-amd64
+          - os: windows-latest
+            platform: windows-amd64
+            msvc_arch: x64
+          - os: windows-11-arm
+            platform: windows-arm64
+            msvc_arch: arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - name: Join tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_CLIENT_SECRET }}
+          tags: tag:ci
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Start sccache
+        run: sccache --start-server
+      
+      - name: Install dependencies (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install cmake ninja
+
+      - name: Set up MSVC (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      - name: Build and install runtime
+        shell: bash
+        run: |
+          PREFIX="$PWD/install/${{ matrix.platform }}"
+          cmake -S runtime -B runtime/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PREFIX"
+          cmake --build runtime/build
+          cmake --install runtime/build
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: runtime-${{ matrix.platform }}
+          path: install/${{ matrix.platform }}
+          if-no-files-found: error
+
+  commit:
+    needs: build
+    runs-on: [self-hosted, lfs-home]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          lfs: false
+
+      - name: Configure Forgejo credentials for LFS
+        run: |
+          umask 077
+          printf 'machine git.isaksweb.xyz\nlogin %s\npassword %s\n' \
+            "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
+      
+      - name: Clean dir
+        run: |
+          rm -rf install
+
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: runtime-*
+          path: install/ # each artifact lands in its own subfolder
+
+      - name: Commit and push runtime artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add install/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Update runtime artifacts [skip ci]"
+          git pull --rebase
+          git push
+
+      - name: Remove Forgejo credentials
+        if: always()
+        run: rm -f "$HOME/.netrc"
