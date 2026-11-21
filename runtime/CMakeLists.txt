@@ -11,7 +11,6 @@ set(WICK_RUNTIME_SOURCES
 
 set(WICK_RUNTIME_HEADERS
     src/runtime.h
-    src/args/args.h
 )
 
 add_library(wick_runtime STATIC ${WICK_RUNTIME_SOURCES})
