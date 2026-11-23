@@ -267,7 +267,7 @@ func Init() error {
 		outPath := filepath.Join(dir, "std", rel)
 
 		// Skip if already cached
-		if _, err := os.Stat(outPath); err != nil {
+		if _, err := os.Stat(outPath); err == nil {
 			return nil
 		}
 
