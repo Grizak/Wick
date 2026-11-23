@@ -163,7 +163,7 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				Name:  *name.Value,
 				Type:  nil,
 				Expr:  expr,
-				Const: false,
+				Const: true,
 				Pos:   expr.Pos,
 			}})
 		case types.TokenReturnStmt:

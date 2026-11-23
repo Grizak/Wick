@@ -29,6 +29,16 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 			return err
 		}
 
+		runtimeLibFile, err := toolchain.RuntimeLibFile(platform)
+		if err != nil {
+			return err
+		}
+
+		runtimeLibPath, err := toolchain.RuntimeLibPath(platform)
+		if err != nil {
+			return err
+		}
+
 		stub, err := buildCtorStub(target, targetMachine, libcDir)
 		if err != nil {
 			return err
@@ -44,8 +54,10 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 		args = append(args, "/out:"+exeOut)
 		args = append(args, "/entry:mainCRTStartup") // <-- MinGW's C entry, calls your main
 		args = append(args, "/libpath:"+libcDir)
+		args = append(args, "/libpath:"+runtimeLibPath)
 
 		args = append(args, obj)
+		args = append(args, runtimeLibFile)
 		args = append(args, stub)
 		args = append(args, filepath.Join(libcDir, "crt2.o"))
 		args = append(args, filepath.Join(libcDir, "libmingw32.a"))
@@ -70,13 +82,25 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 			return err
 		}
 
+		runtimeLibFile, err := toolchain.RuntimeLibFile(platform)
+		if err != nil {
+			return err
+		}
+
+		runtimeLibPath, err := toolchain.RuntimeLibPath(platform)
+		if err != nil {
+			return err
+		}
+
 		args = append(args, "-arch", arch)
 		args = append(args, "-platform_version", "macos", "11.0", "11.0")
 		args = append(args, "-L", libcDir)
+		args = append(args, "-L", runtimeLibPath)
 		args = append(args, "-lSystem")
 		args = append(args, "-o", outFile)
 
 		args = append(args, obj)
+		args = append(args, runtimeLibFile)
 
 	case "x86_64-pc-linux-gnu", "aarch64-pc-linux-gnu":
 		platform := "linux_amd64"
@@ -89,6 +113,16 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 			return err
 		}
 
+		runtimeLibFile, err := toolchain.RuntimeLibFile(platform)
+		if err != nil {
+			return err
+		}
+
+		runtimeLibPath, err := toolchain.RuntimeLibPath(platform)
+		if err != nil {
+			return err
+		}
+
 		// Before obj: _start + init prologue from musl
 		args = append(args,
 			filepath.Join(libcDir, "crt1.o"),
@@ -97,20 +131,12 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 			"-o", outFile,
 		)
 
-		args = append(args, obj)
+		args = append(args, "-L", libcDir)
+		args = append(args, "-L", runtimeLibPath)
 
-	default:
-		args = append(args, "-o", outFile)
 		args = append(args, obj)
-	}
+		args = append(args, runtimeLibFile)
 
-	// After obj: libc + init epilogue
-	if target == "x86_64-pc-linux-gnu" || target == "aarch64-pc-linux-gnu" {
-		platform := "linux_amd64"
-		if target == "aarch64-pc-linux-gnu" {
-			platform = "linux_arm64"
-		}
-		libcDir, err := toolchain.LibcDir(platform)
 		if err != nil {
 			return err
 		}
@@ -119,6 +145,10 @@ func Link(obj, outFile string, save bool, target string, ldflags []string, targe
 			filepath.Join(libcDir, "libm.a"),
 			filepath.Join(libcDir, "crtn.o"),
 		)
+
+	default:
+		args = append(args, "-o", outFile)
+		args = append(args, obj)
 	}
 
 	args = append(args, ldflags...)

@@ -153,6 +153,8 @@ are not supported in imported modules. Imports are only allowed at the top level
 
 Import functions from another programming language
 
+Functions declared by Wick's bundled runtime headers (such as `print`) are available without an explicit extern declaration.
+
 ```bash
 @extern("c")
 fn puts(msg: *i8): i32

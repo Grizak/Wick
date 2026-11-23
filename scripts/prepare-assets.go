@@ -12,6 +12,7 @@ const (
 	assetsDir    = "src/internal/assets"
 	changelogDir = "src/internal/assets/changelog"
 	runtimeDir   = "src/internal/llvm/toolchain/runtime"
+	stdDir       = "src/internal/llvm/toolchain/std"
 )
 
 func main() {
@@ -64,6 +65,30 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	err = filepath.WalkDir("std", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel("std", path)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(stdDir, rel)
+
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyFile(path, dst)
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

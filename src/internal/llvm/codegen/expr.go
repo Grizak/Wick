@@ -29,8 +29,8 @@ func (g *Generator) generateExpression(expr ast.NodeExpression) (llvm.Value, err
 		}
 
 		// Unique global name per literal.
-		name := fmt.Sprintf(".str.%d", g.funcCount)
-		g.funcCount++
+		name := fmt.Sprintf(".str.%d", g.stringCount)
+		g.stringCount++
 
 		// [N x i8] global, with \0 terminator for C.
 		strConst := llvm.ConstString(s, true)
@@ -127,8 +127,7 @@ func (g *Generator) generateExpression(expr ast.NodeExpression) (llvm.Value, err
 		if err != nil {
 			return llvm.Value{}, g.error(err.Error(), expr.Pos)
 		}
-		name := fmt.Sprintf("func_%d", g.funcCount)
-		g.funcCount++
+		name := g.functionName("", expr.FuncDecl.Pos)
 		fnValue := llvm.AddFunction(g.module, name, g.llvmType(fnType))
 		if err := g.emitFuncBody(expr.FuncDecl, fnType, fnValue, ""); err != nil {
 			return llvm.Value{}, err

@@ -38,7 +38,7 @@ type Generator struct {
 	currentFuncReturn types.Type
 	loopEndBlock      llvm.BasicBlock
 	loopNextBlock     llvm.BasicBlock
-	funcCount         int
+	stringCount       int
 	blockCount        int
 	valueCount        int
 	exitFunction      llvm.Value
@@ -64,58 +64,19 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 	g.target = target
 	g.builder = builder
 	g.context = ctx
-	g.globalScope = g.scope
 	g.currentProgram = g.root
 
-	i32Type := ctx.Int32Type()
-	entryType := llvm.FunctionType(i32Type, nil, false)
-	entry := llvm.AddFunction(mod, "main", entryType)
-	entryBlock := ctx.AddBasicBlock(entry, "entry")
+	if err := g.validateRootProgram(); err != nil {
+		return err
+	}
 
 	exitFn, err := g.createExitFunction()
 	if err != nil {
 		return err
 	}
-	exitType := &typesys.FunctionType{
-		ParamTypes: []types.Type{&typesys.Int64Type{}},
-		ReturnType: &typesys.VoidType{},
-		Defaults:   []*ast.NodeExpression{nil},
-	}
-	if err := g.scope.declare("exit", Symbol{
-		llvmValue:  exitFn,
-		isConst:    true,
-		symbolType: exitType,
-	}); err != nil {
-		return err
-	}
 	g.exitFunction = exitFn
-	g.typeChecker.Environment().Define("exit", exitType)
-	if err := g.defineProgramModules(g.root); err != nil {
+	if err := g.generateModule(g.root); err != nil {
 		return err
-	}
-
-	builder.SetInsertPointAtEnd(entryBlock)
-	for i := range g.root.Statements {
-		if importNode := g.root.Statements[i].Import; importNode != nil {
-			if err := g.generateImport(importNode); err != nil {
-				return err
-			}
-		}
-	}
-	for _, statement := range g.root.Statements {
-		if statement.Import != nil {
-			continue
-		}
-		if g.currentBlockTerminated() {
-			break
-		}
-		if err := g.generateStatement(&statement); err != nil {
-			return err
-		}
-	}
-	if !g.currentBlockTerminated() {
-		zero := llvm.ConstInt(i32Type, 0, false)
-		builder.CreateRet(zero)
 	}
 
 	if err := llvm.VerifyModule(mod, llvm.PrintMessageAction); err != nil {
@@ -126,6 +87,57 @@ func (g *Generator) Generate(mod llvm.Module, target target.Target, builder llvm
 		return err
 	}
 	return nil
+}
+
+func (g *Generator) validateRootProgram() error {
+	hasMain := false
+	for _, stmt := range g.root.Statements {
+		switch {
+		case stmt.Import != nil || stmt.Extern != nil:
+			continue
+		case stmt.VarDecl != nil && stmt.VarDecl.Expr.FuncDecl != nil:
+			if stmt.VarDecl.Name == "main" {
+				hasMain = true
+			}
+		default:
+			return g.error("executable statements must be inside fn main", statementPosition(&stmt))
+		}
+	}
+	if !hasMain {
+		return fmt.Errorf("root module must define fn main")
+	}
+	return nil
+}
+
+func statementPosition(stmt *ast.NodeStatement) types.Position {
+	switch {
+	case stmt.Exit != nil:
+		return stmt.Exit.Pos
+	case stmt.FuncCall != nil:
+		return stmt.FuncCall.Pos
+	case stmt.VarDecl != nil:
+		return stmt.VarDecl.Pos
+	case stmt.VarAssign != nil:
+		return stmt.VarAssign.Pos
+	case stmt.Block != nil:
+		return stmt.Block.Pos
+	case stmt.If != nil:
+		return stmt.If.Pos
+	case stmt.For != nil:
+		return stmt.For.Pos
+	case stmt.Break != nil:
+		return stmt.Break.Pos
+	case stmt.Continue != nil:
+		return stmt.Continue.Pos
+	case stmt.Return != nil:
+		return stmt.Return.Pos
+	case stmt.Import != nil:
+		return stmt.Import.Pos
+	case stmt.Extern != nil:
+		return stmt.Extern.Pos
+	default:
+		return types.Position{}
+	}
 }
 
 func (g *Generator) defineProgramModules(program *ast.NodeProgram) error {

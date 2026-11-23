@@ -1,4 +1,7 @@
 @extern("c")
 fn puts(msg: *i8): i32
 
-puts("hello world")
+fn main(): i32 {
+  puts("hello world")
+  return 0
+}

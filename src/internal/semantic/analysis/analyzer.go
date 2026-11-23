@@ -27,6 +27,10 @@ func NewAnalyzer() *Analyzer {
 }
 
 func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
+	return a.CheckProgramWithExterns(prog, nil)
+}
+
+func (a *Analyzer) CheckProgramWithExterns(prog *ast.NodeProgram, externs []ast.NodeExtern) error {
 	a.programs = nil
 	a.programsByPath = make(map[string]*ast.NodeProgram)
 	a.visiting = make(map[string]bool)
@@ -59,6 +63,10 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	a.programs = append(a.programs, prog)
 
 	for _, module := range a.programs {
+		module.Statements = addExterns(module.Statements, externs)
+	}
+
+	for _, module := range a.programs {
 		tc := typesys.NewTypeChecker()
 		if err := a.defineImportedModules(tc, module); err != nil {
 			return err
@@ -68,6 +76,30 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 		}
 	}
 	return nil
+}
+
+func addExterns(statements []ast.NodeStatement, externs []ast.NodeExtern) []ast.NodeStatement {
+	declared := make(map[string]bool)
+	for _, stmt := range statements {
+		switch {
+		case stmt.Extern != nil:
+			declared[stmt.Extern.Name] = true
+		case stmt.VarDecl != nil && stmt.VarDecl.Expr.FuncDecl != nil:
+			declared[stmt.VarDecl.Name] = true
+		}
+	}
+
+	added := make([]ast.NodeStatement, 0, len(externs)+len(statements))
+	for _, extern := range externs {
+		// The runtime's main is a linker entry point; Wick's main is its implementation.
+		if extern.Name == "main" || declared[extern.Name] {
+			continue
+		}
+		externCopy := extern
+		added = append(added, ast.NodeStatement{Extern: &externCopy})
+		declared[extern.Name] = true
+	}
+	return append(added, statements...)
 }
 
 func (a *Analyzer) resolveImports(prog *ast.NodeProgram, currentPath string) error {

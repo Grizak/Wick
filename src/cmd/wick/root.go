@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 
+	"github.com/Grizak/Wick/src/cmd/wick/toolchain"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,4 +47,6 @@ func init() {
 	viper.BindPFlag("ldflags", flags.Lookup("ldflags"))
 	viper.BindPFlag("debug", flags.Lookup("debug"))
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
+
+	rootCmd.AddCommand(toolchain.ToolchainCmd)
 }

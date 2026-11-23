@@ -1,20 +1,17 @@
 import "math.wk"
 
-// Test import c
-@extern("c")
-fn puts(message: *i8): i32
-
 let sum = fn(upper: i64 = 10): i64 {
-	let sum = 0
+	let s = 0
 	for let k = 1; k <= upper; k = k + 1 {
-		sum = sum + k
+		s = s + k
 	}
-	return sum
+	return s
 }
 
-// 1+2+3+4+...+19+20 = 210
-let s = math.divide(sum(20), 21)
+fn main(): i32 {
+	// 1+2+3+4+...+19+20 = 210
+	let s = math.divide(sum(20), 21)
 
-puts("hello world")
-
-exit(s) // echo $? == 10
+	print("hello world")
+	return s // echo $? == 10
+}
