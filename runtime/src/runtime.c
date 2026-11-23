@@ -11,11 +11,11 @@ int main(int argc, char *argv[]) {
   return code;
 }
 
-void print(const char *message) {
+void wick_print(const char *message) {
   (void)puts(message);
 }
 
-int atoi(const char *str) {
+int wick_atoi(const char *str) {
   return (int)strtol(str, NULL, 10);
 }
 
@@ -23,7 +23,7 @@ int wick_strlen(const char *str) {
   return strlen(str);
 }
 
-char *strmerge(const char *str1, const char *str2) {
+char *wick_strmerge(const char *str1, const char *str2) {
   size_t len1 = strlen(str1);
   size_t len2 = strlen(str2);
   char *result = (char *)malloc(len1 + len2 + 1);
@@ -36,10 +36,10 @@ char *strmerge(const char *str1, const char *str2) {
   return result;
 }
 
-int argc() {
+int wick_argc() {
   return args_get_argc();
 }
 
-char **argv() {
+char **wick_argv() {
   return args_get_argv();
 }
