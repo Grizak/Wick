@@ -24,72 +24,79 @@ func main() {
 
 func run() error {
 	if err := os.MkdirAll(changelogDir, 0o755); err != nil {
-		return err
+		return fmt.Errorf("create changelog directory: %w", err)
 	}
+
 	if err := copyFile("LICENSE", filepath.Join(assetsDir, "LICENSE")); err != nil {
+		return fmt.Errorf("copy license: %w", err)
+	}
+
+	if err := copyReleaseNotes(); err != nil {
 		return err
 	}
 
+	if err := copyTree("install", runtimeDir); err != nil {
+		return fmt.Errorf("copy runtime files: %w", err)
+	}
+
+	if err := copyTree("std", stdDir); err != nil {
+		return fmt.Errorf("copy standard library files: %w", err)
+	}
+
+	return nil
+}
+
+func copyReleaseNotes() error {
 	notes, err := filepath.Glob("release-notes/*.md")
 	if err != nil {
-		return err
+		return fmt.Errorf("find release notes: %w", err)
 	}
 	if len(notes) == 0 {
 		return fmt.Errorf("no release notes found in release-notes/*.md")
 	}
+
 	for _, note := range notes {
-		if err := copyFile(note, filepath.Join(changelogDir, filepath.Base(note))); err != nil {
-			return err
+		dst := filepath.Join(changelogDir, filepath.Base(note))
+		if err := copyFile(note, dst); err != nil {
+			return fmt.Errorf("copy release note %q: %w", note, err)
 		}
-	}
-
-	err = filepath.WalkDir("install", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		rel, err := filepath.Rel("install", path)
-		if err != nil {
-			return err
-		}
-		dst := filepath.Join(runtimeDir, rel)
-
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return err
-		}
-		return copyFile(path, dst)
-	})
-	if err != nil {
-		return err
-	}
-
-	err = filepath.WalkDir("std", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		rel, err := filepath.Rel("std", path)
-		if err != nil {
-			return err
-		}
-		dst := filepath.Join(stdDir, rel)
-
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return err
-		}
-		return copyFile(path, dst)
-	})
-	if err != nil {
-		return err
 	}
 
 	return nil
+}
+
+func copyTree(srcRoot, dstRoot string) error {
+	// Delete the old dstRoot
+	err := os.RemoveAll(dstRoot)
+	if err != nil {
+		return err
+	}
+
+	// Copy the new files
+	return filepath.WalkDir(srcRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(srcRoot, path)
+		if err != nil {
+			return fmt.Errorf("get relative path for %q: %w", path, err)
+		}
+
+		dst := filepath.Join(dstRoot, rel)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return fmt.Errorf("create directory for %q: %w", dst, err)
+		}
+
+		if err := copyFile(path, dst); err != nil {
+			return fmt.Errorf("copy %q to %q: %w", path, dst, err)
+		}
+
+		return nil
+	})
 }
 
 func copyFile(src, dst string) (err error) {

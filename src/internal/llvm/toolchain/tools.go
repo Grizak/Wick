@@ -92,90 +92,105 @@ func RuntimeLibFile(platform string) (string, error) {
 	return libFile, nil
 }
 
+func StdlibPath() (string, error) {
+	if err := Init(); err != nil {
+		return "", err
+	}
+	dir, err := CacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "std"), nil
+}
+
 // Init initializes the cache directory and extracts the embedded libc and runtime files to it. Should look like
 // ~/.cache/wick/tools/
 // ├── libc
-// │   ├── darwin_amd64
-// │   │   ├── libSystem.B.tbd
-// │   │   └── libSystem.tbd
-// │   ├── darwin_arm64
-// │   │   ├── libSystem.B.tbd
-// │   │   └── libSystem.tbd
-// │   ├── linux_amd64
-// │   │   ├── crt1.o
-// │   │   ├── crti.o
-// │   │   ├── crtn.o
-// │   │   ├── libc.a
-// │   │   └── libm.a
-// │   ├── linux_arm64
-// │   │   ├── crt1.o
-// │   │   ├── crti.o
-// │   │   ├── crtn.o
-// │   │   ├── libc.a
-// │   │   └── libm.a
-// │   ├── windows_amd64
-// │   │   ├── crt2.o
-// │   │   ├── crtend.o
-// │   │   ├── libgcc.a
-// │   │   ├── libkernel32.a
-// │   │   ├── libmingw32.a
-// │   │   ├── libmingwex.a
-// │   │   ├── libmsvcrt.a
-// │   │   └── libucrt.a
-// │   └── windows_arm64
-// │       ├── crt2.o
-// │       ├── crtend.o
-// │       ├── libgcc.a
-// │       ├── libkernel32.a
-// │       ├── libmingw32.a
-// │       ├── libmingwex.a
-// │       ├── libmsvcrt.a
-// │       └── libucrt.a
-// └── runtime
-//     ├── linux-amd64
-//     │   ├── include
-//     │   │   ├── args.h
-//     │   │   └── runtime.h
-//     │   └── lib
-//     │       └── libwick_runtime.a
-//     ├── linux-arm64
-//     │   ├── include
-//     │   │   ├── args.h
-//     │   │   └── runtime.h
-//     │   └── lib
-//     │       └── libwick_runtime.a
-//     ├── macos-amd64
-//     │   ├── include
-//     │   │   ├── args.h
-//     │   │   └── runtime.h
-//     │   └── lib
-//     │       └── libwick_runtime.a
-//     ├── macos-arm64
-//     │   ├── include
-//     │   │   ├── args.h
-//     │   │   └── runtime.h
-//     │   └── lib
-//     │       └── libwick_runtime.a
-//     ├── windows-amd64
-//     │   ├── include
-//     │   │   ├── args.h
-//     │   │   └── runtime.h
-//     │   └── lib
-//     │       └── wick_runtime.lib
-//     └── windows-arm64
-//         ├── include
-//         │   ├── args.h
-//         │   └── runtime.h
-//         └── lib
-//             └── wick_runtime.lib
+// │   ├── darwin_amd64
+// │   │   ├── libSystem.B.tbd
+// │   │   └── libSystem.tbd
+// │   ├── darwin_arm64
+// │   │   ├── libSystem.B.tbd
+// │   │   └── libSystem.tbd
+// │   ├── linux_amd64
+// │   │   ├── crt1.o
+// │   │   ├── crti.o
+// │   │   ├── crtn.o
+// │   │   ├── libc.a
+// │   │   └── libm.a
+// │   ├── linux_arm64
+// │   │   ├── crt1.o
+// │   │   ├── crti.o
+// │   │   ├── crtn.o
+// │   │   ├── libc.a
+// │   │   └── libm.a
+// │   ├── windows_amd64
+// │   │   ├── crt2.o
+// │   │   ├── crtend.o
+// │   │   ├── libgcc.a
+// │   │   ├── libkernel32.a
+// │   │   ├── libmingw32.a
+// │   │   ├── libmingwex.a
+// │   │   ├── libmsvcrt.a
+// │   │   └── libucrt.a
+// │   └── windows_arm64
+// │       ├── crt2.o
+// │       ├── crtend.o
+// │       ├── libgcc.a
+// │       ├── libkernel32.a
+// │       ├── libmingw32.a
+// │       ├── libmingwex.a
+// │       ├── libmsvcrt.a
+// │       └── libucrt.a
+// ├── runtime
+// │   ├── linux_amd64
+// │   │   ├── include
+// │   │   │   └── runtime.h
+// │   │   └── lib
+// │   │       └── libwick_runtime.a
+// │   ├── linux_arm64
+// │   │   ├── include
+// │   │   │   └── runtime.h
+// │   │   └── lib
+// │   │       └── libwick_runtime.a
+// │   ├── macos_amd64
+// │   │   ├── include
+// │   │   │   └── runtime.h
+// │   │   └── lib
+// │   │       └── libwick_runtime.a
+// │   ├── macos_arm64
+// │   │   ├── include
+// │   │   │   └── runtime.h
+// │   │   └── lib
+// │   │       └── libwick_runtime.a
+// │   ├── windows_amd64
+// │   │   ├── include
+// │   │   │   └── runtime.h
+// │   │   └── lib
+// │   │       └── wick_runtime.lib
+// │   └── windows_arm64
+// │       ├── include
+// │       │   └── runtime.h
+// │       └── lib
+// │           └── wick_runtime.lib
+// └── std
+//     └── fmt
+//         └── fmt.wk
 //
-// 27 directories, 48 files
+// 29 directories, 43 files
 
 func Init() error {
 	dir, err := CacheDir()
 	if err != nil {
 		return err
 	}
+
+	// Clear the directory first so we get a clean copy
+	// with the correct binaries for this version on the compiler
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -198,11 +213,6 @@ func Init() error {
 		// rel  = linux_amd64/crt1.o
 		rel := strings.TrimPrefix(path, "libc/")
 		outPath := filepath.Join(dir, "libc", rel)
-
-		// Skip if already cached - same logic you had
-		if _, err := os.Stat(outPath); err == nil {
-			return nil
-		}
 
 		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
 			return err
@@ -233,11 +243,6 @@ func Init() error {
 		rel = strings.ReplaceAll(rel, "-", "_")
 		outPath := filepath.Join(dir, "runtime", rel)
 
-		// Skip if already cached
-		if _, err := os.Stat(outPath); err == nil {
-			return nil
-		}
-
 		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
 			return err
 		}
@@ -265,11 +270,6 @@ func Init() error {
 		// rel  = linux_amd64/std/fmt/fmt.wk
 		rel := strings.TrimPrefix(path, "std/")
 		outPath := filepath.Join(dir, "std", rel)
-
-		// Skip if already cached
-		if _, err := os.Stat(outPath); err == nil {
-			return nil
-		}
 
 		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
 			return err

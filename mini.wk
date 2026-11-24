@@ -1,7 +1,6 @@
-@extern("c")
-fn puts(msg: *i8): i32
+import "std/fmt.wk"
 
 fn main(): i32 {
-  puts("hello world")
+  fmt.print("hello world")
   return 0
 }

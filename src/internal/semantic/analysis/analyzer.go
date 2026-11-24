@@ -9,6 +9,7 @@ import (
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/lexer"
+	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 	"github.com/Grizak/Wick/src/internal/parser"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
 	"github.com/Grizak/Wick/src/internal/types"
@@ -111,6 +112,13 @@ func (a *Analyzer) resolveImports(prog *ast.NodeProgram, currentPath string) err
 		}
 
 		resolvedPath := importNode.Module
+		if strings.HasPrefix(resolvedPath, "std/") {
+			dir, err := toolchain.StdlibPath()
+			if err != nil {
+				return err
+			}
+			resolvedPath = filepath.Join(dir, strings.TrimPrefix("std/", resolvedPath))
+		}
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(filepath.Dir(currentPath), resolvedPath)
 		}
