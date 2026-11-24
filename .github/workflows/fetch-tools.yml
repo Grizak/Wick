@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > musl-cross-make/config.mak <<'EOF'
-          COMMON_CONFIG += CFLAGS="-g0 -O2" CXXFLAGS="-g0 -O2" LDFLAGS="-s -static"
+          COMMON_CONFIG += CFLAGS="-g0 -O2" CXXFLAGS="-g0 -O2" LDFLAGS="-s -static --static"
           COMMON_CONFIG += CC="sccache gcc" CXX="sccache g++"
           EOF
 
