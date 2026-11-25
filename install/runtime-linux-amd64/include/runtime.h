@@ -1,10 +1,10 @@
 int main(int argc, char *argv[]);
 
 // Print a message to the console with a newline appended.
-void print(const char *message);
+void wick_print(const char *message);
 
 // Argc
-int argc();
+int wick_argc();
 
 // Argv
-char **argv();
+char **wick_argv();
