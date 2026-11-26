@@ -1,4 +1,4 @@
-.PHONY: release snapshot build clean check package dev test assets build-runtime configure-runtime
+.PHONY: release snapshot build clean check package dev test assets build-runtime
 
 DEV_OUT ?= ./dist/wick
 ROOT := $(CURDIR)
@@ -60,15 +60,18 @@ assets:
 	@mkdir -p $(dir $(DEV_OUT))
 	go run ./scripts/prepare-assets.go
 
-build-runtime: configure-runtime
-	@cmake --build runtime/build
-	@cmake --install runtime/build
+RUNTIME_BUILD := runtime/build
+RUNTIME_BUILD_FILE := $(RUNTIME_BUILD)/build.ninja
 
-configure-runtime:
-	@cmake -S runtime -B runtime/build -G Ninja \
+$(RUNTIME_BUILD_FILE): runtime/CMakeLists.txt
+	cmake -S runtime -B $(RUNTIME_BUILD) -G Ninja \
 		-DCMAKE_C_COMPILER=$(MUSL_CC) \
 		-DCMAKE_CXX_COMPILER=$(MUSL_CXX) \
 		-DCMAKE_C_COMPILER_LAUNCHER=sccache \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX="$(PREFIX)"
+
+build-runtime: $(RUNTIME_BUILD_FILE)
+	cmake --build $(RUNTIME_BUILD)
+	cmake --install $(RUNTIME_BUILD)
