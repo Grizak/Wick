@@ -213,7 +213,7 @@ jobs:
             -DLLVM_HOST_TRIPLE="${{ matrix.musl_target }}" \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS="lld" \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
@@ -223,7 +223,8 @@ jobs:
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
-          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT \
+            clang-libraries
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -238,7 +239,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DLLVM_BUILD_TOOLS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS="lld" \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
@@ -246,7 +247,8 @@ jobs:
             -DCMAKE_C_FLAGS="-ffunction-sections -fdata-sections" \
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
 
-          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMMCJIT
+          ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMMCJIT \
+            clang-libraries
 
       - name: Copy headers
         run: |
@@ -254,7 +256,9 @@ jobs:
           PLATFORM="${{ matrix.platform }}"
 
           mkdir -p "$OUT/include/$PLATFORM/llvm" \
-                  "$OUT/include/$PLATFORM/llvm-c"
+                  "$OUT/include/$PLATFORM/llvm-c" \
+                  "$OUT/include/$PLATFORM/lld" \
+                  "$OUT/include/$PLATFORM/clang-c"
 
           cp -R llvm-project/llvm/include/llvm/. \
             "$OUT/include/$PLATFORM/llvm/"
@@ -262,6 +266,8 @@ jobs:
             "$OUT/include/$PLATFORM/llvm-c/"
           cp -R llvm-project/lld/include/lld/. \
             "$OUT/include/$PLATFORM/lld/"
+          cp -R llvm-project/clang/include/clang-c/. \
+            "$OUT/include/$PLATFORM/clang-c/"
 
           for flavor in ELF COFF MachO; do
             mkdir -p "$OUT/include/$PLATFORM/lld/$flavor"
@@ -434,7 +440,7 @@ jobs:
             -DLLVM_INCLUDE_BENCHMARKS=OFF \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
-            -DLLVM_ENABLE_PROJECTS=lld \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
             -DLLD_BUILD_TOOLS=OFF \
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
@@ -448,10 +454,11 @@ jobs:
       - name: Copy headers
         run: |
           root=src/internal/llvm/toolchain/include/${{ matrix.platform }}
-          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld"
+          mkdir -p "$root/llvm" "$root/llvm-c" "$root/lld" "$root/clang-c"
           cp -r llvm-project/llvm/include/llvm/. "$root/llvm/"
           cp -r llvm-project/llvm/include/llvm-c/. "$root/llvm-c/"
           cp -r llvm-project/lld/include/lld/. "$root/lld/"
+          cp -r llvm-project/clang/include/clang-c/. "$root/clang-c/"
           for flavor in ELF COFF MachO; do
             mkdir -p "$root/lld/$flavor"
             cp -R "llvm-project/lld/$flavor/." "$root/lld/$flavor/"
@@ -558,7 +565,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # full history needed for the no-ff merge
-          ref: dev
+          ref: ${{ github.ref_name }}
           lfs: false
 
       - name: Configure Forgejo credentials for LFS
@@ -621,8 +628,7 @@ jobs:
 
       - name: Commit updated tools
         run: |
-          git checkout dev
-          git pull --ff-only origin dev
+          git pull --ff-only origin HEAD
 
           git add src/internal/llvm/toolchain/ toolchains/musl/
 
@@ -632,7 +638,7 @@ jobs:
           fi
 
           git commit -m "chore(llvm): update toolchain to ${{ env.LLVM_VERSION }}"
-          git push origin dev
+          git push origin HEAD
 
       - name: Remove Forgejo credentials
         if: always()
