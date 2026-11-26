@@ -65,7 +65,7 @@ jobs:
 
       - name: Start sccache
         run: sccache --start-server
-      
+
       - name: Install dependencies (Linux)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
@@ -112,10 +112,13 @@ jobs:
           umask 077
           printf 'machine git.isaksweb.xyz\nlogin %s\npassword %s\n' \
             "${{ vars.FORGEJO_USER }}" "${{ secrets.FORGEJO_TOKEN }}" > "$HOME/.netrc"
-      
+
       - name: Clean dir
         run: |
           rm -rf install
+
+      - name: Add user-local Go to PATH
+        run: echo "$HOME/.local/opt/go/bin" >> "$GITHUB_PATH"
 
       - uses: actions/download-artifact@v6
         with:
