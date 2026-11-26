@@ -9,6 +9,7 @@ import (
 
 	"github.com/Grizak/Wick/src/internal/ast"
 	"github.com/Grizak/Wick/src/internal/lexer"
+	"github.com/Grizak/Wick/src/internal/llvm/toolchain"
 	"github.com/Grizak/Wick/src/internal/parser"
 	"github.com/Grizak/Wick/src/internal/semantic/typesys"
 	"github.com/Grizak/Wick/src/internal/types"
@@ -27,6 +28,10 @@ func NewAnalyzer() *Analyzer {
 }
 
 func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
+	return a.CheckProgramWithExterns(prog, nil)
+}
+
+func (a *Analyzer) CheckProgramWithExterns(prog *ast.NodeProgram, externs []ast.NodeExtern) error {
 	a.programs = nil
 	a.programsByPath = make(map[string]*ast.NodeProgram)
 	a.visiting = make(map[string]bool)
@@ -59,6 +64,10 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	a.programs = append(a.programs, prog)
 
 	for _, module := range a.programs {
+		module.Statements = addExterns(module.Statements, externs)
+	}
+
+	for _, module := range a.programs {
 		tc := typesys.NewTypeChecker()
 		if err := a.defineImportedModules(tc, module); err != nil {
 			return err
@@ -70,6 +79,30 @@ func (a *Analyzer) CheckProgram(prog *ast.NodeProgram) error {
 	return nil
 }
 
+func addExterns(statements []ast.NodeStatement, externs []ast.NodeExtern) []ast.NodeStatement {
+	declared := make(map[string]bool)
+	for _, stmt := range statements {
+		switch {
+		case stmt.Extern != nil:
+			declared[stmt.Extern.Name] = true
+		case stmt.VarDecl != nil && stmt.VarDecl.Expr.FuncDecl != nil:
+			declared[stmt.VarDecl.Name] = true
+		}
+	}
+
+	added := make([]ast.NodeStatement, 0, len(externs)+len(statements))
+	for _, extern := range externs {
+		// The runtime's main is a linker entry point; Wick's main is its implementation.
+		if extern.Name == "main" || declared[extern.Name] {
+			continue
+		}
+		externCopy := extern
+		added = append(added, ast.NodeStatement{Extern: &externCopy})
+		declared[extern.Name] = true
+	}
+	return append(added, statements...)
+}
+
 func (a *Analyzer) resolveImports(prog *ast.NodeProgram, currentPath string) error {
 	namespaces := make(map[string]string)
 	for i := range prog.Statements {
@@ -79,6 +112,13 @@ func (a *Analyzer) resolveImports(prog *ast.NodeProgram, currentPath string) err
 		}
 
 		resolvedPath := importNode.Module
+		if strings.HasPrefix(resolvedPath, "std/") {
+			dir, err := toolchain.StdlibPath()
+			if err != nil {
+				return err
+			}
+			resolvedPath = filepath.Join(dir, strings.TrimPrefix("std/", resolvedPath))
+		}
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(filepath.Dir(currentPath), resolvedPath)
 		}

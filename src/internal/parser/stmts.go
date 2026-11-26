@@ -85,26 +85,11 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 			}
 			stmts = append(stmts, ast.NodeStatement{VarDecl: decl})
 		case types.TokenIdent:
-			next, err := p.peek(1)
+			ident, err := p.parseIdent(token)
 			if err != nil {
 				return nil, err
 			}
-			switch next.Type {
-			case types.TokenEquals:
-				assign, err := p.parseVarAssign()
-				if err != nil {
-					return nil, err
-				}
-				stmts = append(stmts, ast.NodeStatement{VarAssign: assign})
-			case types.TokenOpenParen:
-				call, err := p.parseFuncCall()
-				if err != nil {
-					return nil, err
-				}
-				stmts = append(stmts, ast.NodeStatement{FuncCall: &call})
-			default:
-				return nil, p.error("expected `=` or `(` after identifier", token)
-			}
+			stmts = append(stmts, *ident)
 		case types.TokenOpenBrace:
 			block, err := p.parseBlock()
 			if err != nil {
@@ -163,7 +148,7 @@ func (p *Parser) parseStatements(terminator types.TokenType) ([]ast.NodeStatemen
 				Name:  *name.Value,
 				Type:  nil,
 				Expr:  expr,
-				Const: false,
+				Const: true,
 				Pos:   expr.Pos,
 			}})
 		case types.TokenReturnStmt:

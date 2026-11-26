@@ -24,8 +24,7 @@ func (g *Generator) generateNamedFuncDecl(decl *ast.NodeVarDecl) error {
 		}
 	}
 
-	name := fmt.Sprintf("func_%d", g.funcCount)
-	g.funcCount++
+	name := g.functionName(decl.Name, decl.Pos)
 	fnValue := llvm.AddFunction(g.module, name, g.llvmType(fnType))
 	sym := Symbol{llvmValue: fnValue, isConst: true, symbolType: fnType}
 	if err := g.scope.declare(decl.Name, sym); err != nil {

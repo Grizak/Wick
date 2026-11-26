@@ -153,6 +153,8 @@ are not supported in imported modules. Imports are only allowed at the top level
 
 Import functions from another programming language
 
+Functions declared by Wick's bundled runtime headers (such as `print`) are available without an explicit extern declaration.
+
 ```bash
 @extern("c")
 fn puts(msg: *i8): i32
@@ -173,7 +175,7 @@ fn pthread_create(...) // For example
 Requires Go 1.26.2+.
 
 ```bash
-git clone https://github.com/Grizak/Wick
+git clone --recurse-submodules https://github.com/Grizak/Wick
 cd Wick
 make setup
 make

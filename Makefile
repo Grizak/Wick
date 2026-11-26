@@ -1,4 +1,4 @@
-.PHONY: release snapshot build build-darwin clean check package dev test
+.PHONY: release snapshot build clean check package dev test assets build-runtime
 
 DEV_OUT ?= ./dist/wick
 ROOT := $(CURDIR)
@@ -8,15 +8,12 @@ LLVM_INCLUDE := $(ROOT)/src/internal/llvm/toolchain/include/$(GOOS_HOST)_$(GOARC
 MUSL_TOOLCHAIN := $(ROOT)/toolchains/musl/linux_amd64
 MUSL_CC := $(MUSL_TOOLCHAIN)/bin/x86_64-linux-musl-gcc
 MUSL_CXX := $(MUSL_TOOLCHAIN)/bin/x86_64-linux-musl-g++
+PREFIX := $(ROOT)/install/runtime-$(GOOS_HOST)-$(GOARCH_HOST)
 
 # Lazily evaluated, so the script only runs for targets that need it
 LDFLAGS_HOST = $(shell $(ROOT)/scripts/llvm-ldflags.sh $(GOOS_HOST)_$(GOARCH_HOST))
 
-version := $(shell git tag --sort=-version:refname | head -1 2>/dev/null || echo "v0.0.0")
-
-dev:
-	mkdir -p $(dir $(DEV_OUT))
-	go run ./scripts/prepare-assets.go
+dev: build-runtime assets
 	CC=$(MUSL_CC) \
 	CXX=$(MUSL_CXX) \
 	CGO_ENABLED=1 \
@@ -24,12 +21,12 @@ dev:
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
 	go build -tags "byollvm llvm20" \
-	-ldflags "-X main.version=$(version) -linkmode=external -extldflags=-static" \
+	-ldflags "-X main.version=dev -linkmode=external -extldflags=-static" \
 	-o "$(DEV_OUT)" ./src/cmd/wick
 
-TEST_FLAGS ?= -v
+TEST_FLAGS ?= -v ./src/...
 
-test:
+test: build-runtime assets
 	CC=gcc \
 	CXX=g++ \
 	CGO_ENABLED=1 \
@@ -37,22 +34,44 @@ test:
 	CGO_CXXFLAGS="-I$(LLVM_INCLUDE) -std=c++17 -ffunction-sections -fdata-sections -flto" \
 	CGO_LDFLAGS="$(LDFLAGS_HOST)" \
 	go test -tags "byollvm llvm20" \
-	 $(TEST_FLAGS) ./src/...
+	 $(TEST_FLAGS)
+
+GORELEASER_FLAGS ?=
 
 release:
-	goreleaser release --clean
+	goreleaser release --clean $(GORELEASER_FLAGS)
 
 snapshot:
-	goreleaser release --snapshot --clean
+	goreleaser release --snapshot --clean $(GORELEASER_FLAGS)
 
 check:
-	goreleaser check
+	goreleaser check $(GORELEASER_FLAGS)
 
 clean:
-	rm -rf dist build
+	rm -rf dist build runtime/build
 
 package:
-	goreleaser release --skip=publish --clean
+	goreleaser release --skip=publish --clean $(GORELEASER_FLAGS)
 
 setup:
 	git config core.hooksPath .githooks
+
+assets:
+	@mkdir -p $(dir $(DEV_OUT))
+	go run ./scripts/prepare-assets.go
+
+RUNTIME_BUILD := runtime/build
+RUNTIME_BUILD_FILE := $(RUNTIME_BUILD)/build.ninja
+
+$(RUNTIME_BUILD_FILE): runtime/CMakeLists.txt
+	cmake -S runtime -B $(RUNTIME_BUILD) -G Ninja \
+		-DCMAKE_C_COMPILER=$(MUSL_CC) \
+		-DCMAKE_CXX_COMPILER=$(MUSL_CXX) \
+		-DCMAKE_C_COMPILER_LAUNCHER=sccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="$(PREFIX)"
+
+build-runtime: $(RUNTIME_BUILD_FILE)
+	cmake --build $(RUNTIME_BUILD)
+	cmake --install $(RUNTIME_BUILD)

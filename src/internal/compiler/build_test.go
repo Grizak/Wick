@@ -80,8 +80,18 @@ func TestCompileInputsReturnsAfterAssembly(t *testing.T) {
 	}
 
 	dir := t.TempDir()
+	module := filepath.Join(dir, "helper.wk")
+	if err := os.WriteFile(module, []byte(`fn getArgc(): i32 {
+	print("hello")
+	return args_get_argc()
+}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	input := filepath.Join(dir, "program.wk")
-	if err := os.WriteFile(input, []byte("exit(0)"), 0600); err != nil {
+	if err := os.WriteFile(input, []byte(`import "helper.wk"
+fn main(): i32 {
+	return helper.getArgc()
+}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 

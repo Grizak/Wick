@@ -1,0 +1,3 @@
+[submodule "third_party/libclang"]
+	path = third_party/libclang
+	url = https://github.com/Grizak/libclang.git

@@ -385,6 +385,8 @@ func (tc *TypeChecker) ParseTypeString(typeStr string) (types.Type, error) {
 
 	// Handle base types
 	switch typeStr {
+	case "void":
+		return &VoidType{}, nil
 	case "i8":
 		return &Int8Type{}, nil
 	case "i32":

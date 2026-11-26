@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 0
           lfs: false
+          submodules: true
+
       - name: Pull LFS objects from Forgejo
         run: git lfs pull --include="src/internal/llvm/toolchain/libc/*,src/internal/llvm/toolchain/lib/${{ matrix.platform }},toolchains/musl/${{ matrix.platform }}"
       - name: Export LLVM link flags

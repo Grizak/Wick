@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added v command as an alias for version
+- Added the runtime
+- Made the main function mandatory (**breaking change**)
+
 ## [v4.5.4] - 2026-11-20
 
 - Updated packages script (again)

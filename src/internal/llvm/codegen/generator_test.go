@@ -18,8 +18,12 @@ func TestGenerateBuildsVerifiedLLVMModule(t *testing.T) {
 	source := `fn add(a: i64, b: i64 = 2): i64 {
 	return a + b
 }
-	fn increment(value: i32): i32 {
-		return value + 1
+fn increment(value: i32): i32 {
+	return value + 1
+}
+fn main(): i32 {
+	let callback = fn(): i64 {
+		return 3
 	}
 	let result = add(5)
 	let narrow: i32 = increment(1)
@@ -27,14 +31,15 @@ func TestGenerateBuildsVerifiedLLVMModule(t *testing.T) {
 	if result > 4 {
 		result = result + 1
 	} else {
-	result = result + 2
-}
-for let i = 0; i < 2; i = i + 1 {
-	if i == 1 {
-		break
+		result = result + 2
 	}
+	for let i = 0; i < 2; i = i + 1 {
+		if i == 1 {
+			break
+		}
+	}
+	return narrow
 }
-exit(result)
 `
 
 	lex := lexer.NewLexer(source, "test.wk")
@@ -62,7 +67,16 @@ exit(result)
 	}
 
 	ir := mod.String()
-	for _, expected := range []string{"define i32 @main()", "define i64 @func_0", "br i1"} {
+	if strings.Contains(ir, "define i32 @main()") {
+		t.Errorf("generated IR should not define the runtime main function:\n%s", ir)
+	}
+	for _, expected := range []string{
+		"define i32 @wick_main_main",
+		"define i64 @wick_main_add",
+		"define i32 @wick_main_increment",
+		"@wick_main_anonymous_",
+		"br i1",
+	} {
 		if !strings.Contains(ir, expected) {
 			t.Errorf("generated IR does not contain %q:\n%s", expected, ir)
 		}
@@ -86,8 +100,10 @@ fn addFive(value: i64): i64 {
 	}
 	rootPath := filepath.Join(dir, "main.wk")
 	source := `import "arithmetic.wk"
-let result = arithmetic.addFive(5)
-exit(result)`
+fn main(): i32 {
+	let result = arithmetic.addFive(5)
+	return 0
+}`
 
 	lex := lexer.NewLexer(source, rootPath)
 	tokens := make(chan types.LexerResult, 4096)
@@ -116,11 +132,15 @@ exit(result)`
 	}
 
 	ir := mod.String()
+	if strings.Contains(ir, "define i32 @main()") {
+		t.Errorf("generated IR should not define the runtime main function:\n%s", ir)
+	}
 	for _, expected := range []string{
-		"define i64 @func_0",
-		"define i64 @func_1",
-		"call i64 @func_0",
-		"call i64 @func_1",
+		"define i32 @wick_main_main",
+		"define i64 @wick_math_add",
+		"define i64 @wick_arithmetic_addFive",
+		"call i64 @wick_math_add",
+		"call i64 @wick_arithmetic_addFive",
 	} {
 		if !strings.Contains(ir, expected) {
 			t.Errorf("generated IR does not contain %q:\n%s", expected, ir)

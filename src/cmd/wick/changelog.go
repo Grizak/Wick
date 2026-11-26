@@ -18,17 +18,25 @@ var changelogCmd = &cobra.Command{
 			v = args[0]
 		}
 
-		changelog, err := assets.Changelog.ReadFile(fmt.Sprintf("changelog/%s.md", v))
-		if err != nil {
-			return fmt.Errorf("read changelog for %q: %w", v, err)
-		}
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
 
 		fmt.Printf("%s:\n", v)
-		utils.PrintMd(string(changelog))
-		return nil
+
+		return printChangelog(v)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(changelogCmd)
+}
+
+func printChangelog(v string) error {
+	changelog, err := assets.Changelog.ReadFile(fmt.Sprintf("changelog/%s.md", v))
+	if err != nil {
+		return fmt.Errorf("read changelog for %q: %w", v, err)
+	}
+
+	utils.PrintMd(string(changelog))
+	return nil
 }

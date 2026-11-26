@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/Grizak/Wick/src/internal/lexer"
 	"github.com/Grizak/Wick/src/internal/llvm/assembler"
@@ -155,8 +156,17 @@ func compileInputs(opts BuildOptions, tm llvm.TargetMachine) (string, []string, 
 		return "", nil, err
 	}
 
+	includeDir, err := toolchain.RuntimeIncludePath(strings.ReplaceAll(opts.Target, "/", "_"))
+	if err != nil {
+		return "", nil, fmt.Errorf("locate runtime headers: %w", err)
+	}
+	runtimeExterns, err := parseRuntimeHeaders(includeDir)
+	if err != nil {
+		return "", nil, err
+	}
+
 	sa := analysis.NewAnalyzer()
-	if err := sa.CheckProgram(&program); err != nil {
+	if err := sa.CheckProgramWithExterns(&program, runtimeExterns); err != nil {
 		return "", nil, err
 	}
 
