@@ -224,7 +224,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--gc-sections"
 
           ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMRuntimeDyld LLVMMCJIT \
-            clang-libraries
+            clang-libraries libclang
 
       - name: Build LLVM libraries and lld (macOS)
         if: runner.os == 'macOS'
@@ -248,7 +248,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
 
           ninja -C build LLVMExecutionEngine LLVMInterpreter LLVMMCJIT \
-            clang-libraries
+            clang-libraries libclang
 
       - name: Copy headers
         run: |
