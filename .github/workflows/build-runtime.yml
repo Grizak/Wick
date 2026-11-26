@@ -122,6 +122,9 @@ jobs:
           pattern: runtime-*
           path: install/ # each artifact lands in its own subfolder
 
+      - name: Run the assets target
+        run: make assets
+
       - name: Commit and push runtime artifacts
         run: |
           git config user.name "github-actions[bot]"

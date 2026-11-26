@@ -1,4 +1,4 @@
-import "std/fmt.wk"
+import "fmt.wk"
 
 fn main(): i32 {
   fmt.print("hello world")

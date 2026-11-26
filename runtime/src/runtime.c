@@ -11,7 +11,9 @@ int main(int argc, char *argv[]) {
   return code;
 }
 
-void wick_print(const char *message) {
+void wick_print_impl(const char *message) __asm__("wick_print.1");
+
+void wick_print_impl(const char *message) {
   (void)puts(message);
 }
 

@@ -25,6 +25,9 @@ func init() {
 func runBuild(cmd *cobra.Command, args []string) error {
 	target := viper.GetString("target")
 
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+
 	if target == "" {
 		target = runtime.GOOS + "/" + runtime.GOARCH
 	}

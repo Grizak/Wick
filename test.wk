@@ -12,6 +12,6 @@ fn main(): i32 {
 	// 1+2+3+4+...+19+20 = 210
 	let s = math.divide(sum(20), 21)
 
-	print("hello world")
+	wick_print("hello world")
 	return s // echo $? == 10
 }
