@@ -5,6 +5,8 @@ on:
     paths:
       - "runtime/**"
       - ".github/workflows/build-runtime.yml"
+    branches:
+      - "**"
   workflow_dispatch:
 
 permissions:
