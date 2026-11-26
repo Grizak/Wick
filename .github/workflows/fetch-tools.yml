@@ -627,7 +627,7 @@ jobs:
 
       - name: Commit updated tools
         run: |
-          git pull --ff-only origin HEAD
+          git pull --ff-only origin ${{ github.ref_name }}
 
           git add src/internal/llvm/toolchain/ toolchains/musl/
 
@@ -637,7 +637,7 @@ jobs:
           fi
 
           git commit -m "chore(llvm): update toolchain to ${{ env.LLVM_VERSION }}"
-          git push origin HEAD
+          git push origin ${{ github.ref_name }}
 
       - name: Remove Forgejo credentials
         if: always()
