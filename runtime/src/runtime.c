@@ -11,7 +11,11 @@ int main(int argc, char *argv[]) {
   return code;
 }
 
+#if defined(_MSC_VER)
+#pragma comment(linker, "/alternatename:wick_print_impl=wick_print.1")
+#else
 void wick_print_impl(const char *message) __asm__("wick_print.1");
+#endif
 
 void wick_print_impl(const char *message) {
   (void)puts(message);
