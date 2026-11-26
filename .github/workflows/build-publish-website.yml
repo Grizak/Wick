@@ -17,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: pages-pre-push
           path: master
       - uses: actions/checkout@v6
         with:

@@ -173,7 +173,7 @@ fn pthread_create(...) // For example
 Requires Go 1.26.2+.
 
 ```bash
-git clone https://github.com/Grizak/Wick
+git clone --recurse-submodules https://github.com/Grizak/Wick
 cd Wick
 make setup
 make
