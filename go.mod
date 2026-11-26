@@ -10,6 +10,8 @@ require (
 	tinygo.org/x/go-llvm v0.0.0-20261030075611-40f1e05c665b
 )
 
+replace github.com/Grizak/libclang => ./third_party/libclang
+
 require (
 	charm.land/lipgloss/v2 v2.0.6 // indirect
 	github.com/alecthomas/chroma v0.10.0 // indirect
